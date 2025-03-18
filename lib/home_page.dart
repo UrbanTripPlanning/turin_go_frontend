@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'search_page.dart';
+import 'api/map.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -9,6 +11,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  late Future<Map<String, dynamic>> trafficData;
+
+  @override
+  void initState() {
+    super.initState();
+    trafficData = MapApi.getTraffic();
+  }
+
   bool showTraffic = false;
   final LatLng _initialPosition = LatLng(45.06298, 7.67773);
 
@@ -32,6 +42,14 @@ class _HomePageState extends State<HomePage> {
                 userAgentPackageName: 'com.example.turinGoFrontend',
               ),
             ],
+          ),
+          RichAttributionWidget(
+            attributions: [
+              TextSourceAttribution(
+                'OpenStreetMap contributors',
+                onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
+              )
+            ]
           ),
           Positioned(
             top: 50,
