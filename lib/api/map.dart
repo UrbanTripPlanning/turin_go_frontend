@@ -3,11 +3,11 @@ import 'package:http/http.dart' as http;
 import 'config.dart';
 
 class MapApi {
-  static Future<Map<String, dynamic>> getMapInfo(
+  static Future<Map<String, dynamic>> getMapInfo({
     int? timestamp
-  ) async {
+  }) async {
     final uri = Uri.parse('${Config.baseURL}/map/info').replace(queryParameters: {
-      'timestamp': timestamp ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000),
+      'timestamp': (timestamp ?? DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
     });
     final response = await http.get(uri);
 
@@ -18,9 +18,14 @@ class MapApi {
     }
   }
 
-  static Future<Map<String, dynamic>> getTraffic() async {
-    final uri = Uri.parse('${Config.baseURL}/map/traffic');
-    final response = await http.get(uri);
+  static Future<Map<String, dynamic>> getTraffic({
+    int? timestamp
+  }) async {
+    final response = await http.get(
+      Uri.parse('${Config.baseURL}/map/traffic').replace(queryParameters: {
+        'timestamp': (timestamp ?? DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
+      }),
+    );
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
