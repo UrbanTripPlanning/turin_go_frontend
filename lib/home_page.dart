@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'search_page.dart';
 // import 'api/road.dart';
@@ -22,6 +23,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late Future<Map<String, dynamic>> roadData;
   late Future<List<TrafficPoint>> trafficData;
+  LatLng? _currentPosition;
 
   @override
   void initState() {
@@ -32,6 +34,34 @@ class _HomePageState extends State<HomePage> {
     //     print(response['data'])
     //   }
     // });
+    _determinePosition();
+  }
+
+  Future<void> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled. Please enable them in your device settings.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error('Location permissions are permanently denied, we cannot request permissions.');
+    } 
+
+    Position position = await Geolocator.getCurrentPosition();
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
+    });
   }
 
   bool showTraffic = false;
@@ -59,7 +89,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           FlutterMap(
             options: MapOptions(
-              center: _initialPosition,
+              center: _currentPosition ?? _initialPosition,
               zoom: 14.0,
             ),
             children: [
@@ -93,6 +123,17 @@ class _HomePageState extends State<HomePage> {
                       );
                     }
                   },
+                ),
+              if (_currentPosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      width: 80.0,
+                      height: 80.0,
+                      point: _currentPosition!,
+                      builder: (ctx) => Icon(Icons.location_on, color: Colors.blue, size: 40),
+                    ),
+                  ],
                 ),
             ],
           ),

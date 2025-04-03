@@ -33,8 +33,10 @@ class SearchPage extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => RoutePage(
-                      start: query,
-                      destination: "Torino Airport",
+                      startName: query,
+                      endName: "Torino Airport",
+                      startCoord: [7.705189, 45.068828],
+                      endCoord: [7.657668, 45.065126],
                     ),
                   ),
                 );
@@ -53,8 +55,10 @@ class SearchPage extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => RoutePage(
-                          start: recentSearches[index],
-                          destination: "Torino Airport",
+                          startName: recentSearches[index],
+                          endName: "Torino Airport",
+                          startCoord: [7.705189, 45.068828],
+                          endCoord: [7.657668, 45.065126],
                         ),
                       ),
                     );
