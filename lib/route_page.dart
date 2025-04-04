@@ -21,10 +21,15 @@ class RoutePage extends StatefulWidget {
 }
 
 class RoutePageState extends State<RoutePage> {
-  List<LatLng> routePoints = [];
+  List<LatLng> walkingRoutePoints = [];
+  List<LatLng> drivingRoutePoints = [];
+  List<LatLng> get currentRoutePoints => _isWalking ? walkingRoutePoints : drivingRoutePoints;
+  bool _isWalking = true;
   bool isLoading = false;
   String? errorMessage;
-  String? routeInfo;
+  String? walkingRouteInfo;
+  String? drivingRouteInfo;
+  String? get currentRouteInfo => _isWalking ? walkingRouteInfo : drivingRouteInfo;
   MapController mapController = MapController();
 
   @override
@@ -46,12 +51,35 @@ class RoutePageState extends State<RoutePage> {
       );
 
       setState(() {
-        List routes = result['data'];
-        routePoints = routes.map((coord) => 
+        Map walkingData = result['data']['walking'];
+        Map drivingData = result['data']['driving'];
+        List walkingRoutes = walkingData['routes'];
+        List drivingRoutes = drivingData['routes'];
+        
+        walkingRoutePoints = walkingRoutes.map((coord) => 
           LatLng(coord[1].toDouble(), coord[0].toDouble())
         ).toList();
 
-        routeInfo = "${result['duration']} min (${result['distance']} km)";
+        drivingRoutePoints = drivingRoutes.map((coord) => 
+          LatLng(coord[1].toDouble(), coord[0].toDouble())
+        ).toList();
+
+        String walkingDistanceStr = "";
+        if (walkingData['distances'] < 1000) {
+          walkingDistanceStr = "${walkingData['distances']} m";
+        } else {
+          walkingDistanceStr = "${(walkingData['distances']/1000).toStringAsFixed(1)} km";
+        }
+
+        String drivingDistanceStr = "";
+        if (drivingData['distances'] < 1000) {
+          drivingDistanceStr = "${drivingData['distances']} m";
+        } else {
+          drivingDistanceStr = "${(drivingData['distances']/1000).toStringAsFixed(1)} km";
+        }
+
+        walkingRouteInfo = "${walkingData['times']} min ($walkingDistanceStr)";
+        drivingRouteInfo = "${drivingData['times']} min ($drivingDistanceStr)";
         isLoading = false;
       });
     } catch (e) {
@@ -63,30 +91,30 @@ class RoutePageState extends State<RoutePage> {
   }
 
   LatLng _calculateCenter() {
-    if (routePoints.isEmpty) return LatLng(45.09298, 7.67773);
+    if (currentRoutePoints.isEmpty) return LatLng(45.09298, 7.67773);
     
     double centerLat = 0;
     double centerLng = 0;
     
-    for (var point in routePoints) {
+    for (var point in currentRoutePoints) {
       centerLat += point.latitude;
       centerLng += point.longitude;
     }
     
     return LatLng(
-      centerLat / routePoints.length,
-      centerLng / routePoints.length
+      centerLat / currentRoutePoints.length,
+      centerLng / currentRoutePoints.length
     );
   }
 
   double _calculateZoom() {
-    if (routePoints.length < 2) return 13.0;
+    if (currentRoutePoints.length < 2) return 13.0;
     
     double maxDistance = 0;
     final distance = Distance();
     
-    for (int i = 0; i < routePoints.length - 1; i++) {
-      double d = distance.as(LengthUnit.Kilometer, routePoints[i], routePoints[i + 1]);
+    for (int i = 0; i < currentRoutePoints.length - 1; i++) {
+      double d = distance.as(LengthUnit.Kilometer, currentRoutePoints[i], currentRoutePoints[i + 1]);
       maxDistance = maxDistance > d ? maxDistance : d;
     }
 
@@ -100,7 +128,19 @@ class RoutePageState extends State<RoutePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Route Planner")),
+      appBar: AppBar(
+        title: Text("Route Planner"),
+        actions: [
+          IconButton(
+            icon: Icon(_isWalking ? Icons.directions_walk : Icons.directions_car),
+            onPressed: () {
+              setState(() {
+                _isWalking = !_isWalking;
+              });
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -154,29 +194,29 @@ class RoutePageState extends State<RoutePage> {
                     urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                     subdomains: ['a', 'b', 'c'],
                   ),
-                  if (routePoints.isNotEmpty)
+                  if (currentRoutePoints.isNotEmpty)
                     PolylineLayer(
                       polylines: [
                         Polyline(
-                          points: routePoints,
+                          points: currentRoutePoints,
                           strokeWidth: 4.0,
-                          color: Colors.blue,
+                          color: _isWalking ? Colors.green : Colors.blue,
                         ),
                       ],
                     ),
-                  if (routePoints.isNotEmpty)
+                  if (currentRoutePoints.isNotEmpty)
                     MarkerLayer(
                       markers: [
                         Marker(
                           width: 80.0,
                           height: 80.0,
-                          point: routePoints.first,
+                          point: currentRoutePoints.first,
                           builder: (ctx) => Icon(Icons.location_on, color: Colors.green, size: 40),
                         ),
                         Marker(
                           width: 80.0,
                           height: 80.0,
-                          point: routePoints.last,
+                          point: currentRoutePoints.last,
                           builder: (ctx) => Icon(Icons.location_on, color: Colors.red, size: 40),
                         ),
                       ],
@@ -189,7 +229,7 @@ class RoutePageState extends State<RoutePage> {
             child: Column(
               children: [
                 Text(
-                  routeInfo ?? "Loading route information...",
+                  currentRouteInfo ?? "Loading route information...",
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Row(
