@@ -4,6 +4,7 @@ import 'api/place.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 
 class SearchPage extends StatefulWidget {
   @override
@@ -18,6 +19,7 @@ class SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   static const String _recentSearchesKey = 'recent_searches';
+  static const String _locationKey = 'user_location';
 
   @override
   void initState() {
@@ -26,7 +28,7 @@ class SearchPageState extends State<SearchPage> {
     _loadRecentSearches();
   }
 
-  // 加载搜索记录
+  // Load search history
   Future<void> _loadRecentSearches() async {
     final prefs = await SharedPreferences.getInstance();
     final searchesJson = prefs.getString(_recentSearchesKey);
@@ -82,10 +84,79 @@ class SearchPageState extends State<SearchPage> {
       });
     } catch (e) {
       setState(() {
-        errorMessage = 'search place fail: ${e.toString()}';
+        errorMessage = 'Failed to search places: ${e.toString()}';
         isLoading = false;
       });
     }
+  }
+
+  // Get user location
+  Future<List<double>?> _getUserLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final locationJson = prefs.getString(_locationKey);
+      
+      if (locationJson != null) {
+        final location = json.decode(locationJson);
+        final timestamp = location['timestamp'] as int;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        
+        // If location data is older than 5 minutes, get new location
+        if (now - timestamp > 5 * 60 * 1000) {
+          return await _getCurrentLocation();
+        }
+        
+        return [location['longitude'], location['latitude']];
+      }
+      
+      return await _getCurrentLocation();
+    } catch (e) {
+      print('Error getting user location: $e');
+      return null;
+    }
+  }
+
+  // Get current location
+  Future<List<double>?> _getCurrentLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      final location = [position.longitude, position.latitude];
+      
+      // Update cache
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_locationKey, json.encode({
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      }));
+      
+      return location;
+    } catch (e) {
+      print('Error getting current location: $e');
+      return null;
+    }
+  }
+
+  void _navigateToRoute(Map<String, dynamic> place, List<double> userLocation) {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RoutePage(
+          startName: "Your location",
+          endName: place['name_en'],
+          startCoord: userLocation,
+          endCoord: [place['Longitude'], place['Latitude']],
+        ),
+      ),
+    );
+  }
+
+  void _showError() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Unable to get current location. Please check location permissions')),
+    );
   }
 
   @override
@@ -122,18 +193,13 @@ class SearchPageState extends State<SearchPage> {
                       leading: Icon(Icons.history),
                       title: Text(place['name_en']),
                       subtitle: Text(place['name_it'] ?? ''),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RoutePage(
-                              startName: "Your location",
-                              endName: place['name_en'],
-                              startCoord: [place['Longitude'], place['Latitude']],
-                              endCoord: [7.657668, 45.065126],
-                            ),
-                          ),
-                        );
+                      onTap: () async {
+                        final userLocation = await _getUserLocation();
+                        if (userLocation != null) {
+                          _navigateToRoute(place, userLocation);
+                        } else {
+                          _showError();
+                        }
                       },
                     );
                   } else {
@@ -142,19 +208,14 @@ class SearchPageState extends State<SearchPage> {
                       leading: Icon(Icons.location_on),
                       title: Text(place['name_en']),
                       subtitle: Text(place['name_it'] ?? ''),
-                      onTap: () {
+                      onTap: () async {
                         _addToRecentSearches(place);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RoutePage(
-                              startName: "Your location",
-                              endName: place['name_en'],
-                              startCoord: [place['Longitude'], place['Latitude']],
-                              endCoord: [7.657668, 45.065126],
-                            ),
-                          ),
-                        );
+                        final userLocation = await _getUserLocation();
+                        if (userLocation != null) {
+                          _navigateToRoute(place, userLocation);
+                        } else {
+                          _showError();
+                        }
                       },
                     );
                   }

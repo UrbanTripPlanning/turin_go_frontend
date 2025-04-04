@@ -3,9 +3,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'search_page.dart';
-// import 'api/road.dart';
 import 'api/map.dart';
+import 'dart:convert';
 
 class TrafficPoint {
   final LatLng start;
@@ -24,16 +25,12 @@ class _HomePageState extends State<HomePage> {
   late Future<Map<String, dynamic>> roadData;
   late Future<List<TrafficPoint>> trafficData;
   LatLng? _currentPosition;
+  static const String _locationKey = 'user_location';
 
   @override
   void initState() {
     super.initState();
     trafficData = fetchTrafficData();
-    // RoadApi.searchRoute(start: '', end: '').then((response) => {
-    //   if (response['code'] == 200) {
-    //     print(response['data'])
-    //   }
-    // });
     _determinePosition();
   }
 
@@ -59,8 +56,17 @@ class _HomePageState extends State<HomePage> {
     } 
 
     Position position = await Geolocator.getCurrentPosition();
+    final location = LatLng(position.latitude, position.longitude);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_locationKey, json.encode({
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    }));
+
     setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
+      _currentPosition = location;
     });
   }
 
