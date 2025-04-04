@@ -26,12 +26,27 @@ class _HomePageState extends State<HomePage> {
   late Future<List<TrafficPoint>> trafficData;
   LatLng? _currentPosition;
   static const String _locationKey = 'user_location';
+  MapController mapController = MapController();
+  bool _isMapMoving = false;
+  List<Polyline> _trafficPolylines = [];
 
   @override
   void initState() {
     super.initState();
-    trafficData = fetchTrafficData();
+    trafficData = fetchTrafficData().then((points) {
+      _updateTrafficPolylines(points);
+      return points;
+    });
     _determinePosition();
+  }
+
+  void _updateTrafficPolylines(List<TrafficPoint> points) {
+    _trafficPolylines = points.map((point) => Polyline(
+      points: [point.start, point.end],
+      strokeWidth: 3.0,
+      color: getColorWithFlowRate(point.flow).withOpacity(0.7),
+      isDotted: false,
+    )).toList();
   }
 
   Future<void> _determinePosition() async {
@@ -71,7 +86,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   bool showTraffic = false;
-  final LatLng _initialPosition = LatLng(45.06298, 7.67773);
+  final LatLng _initialPosition = LatLng(45.06288, 7.66277);
 
   final String normalTileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
@@ -94,9 +109,23 @@ class _HomePageState extends State<HomePage> {
       body: Stack(
         children: [
           FlutterMap(
+            mapController: mapController,
             options: MapOptions(
               center: _currentPosition ?? _initialPosition,
-              zoom: 14.0,
+              zoom: 15.0,
+              maxZoom: 18.0,
+              minZoom: 10.0,
+              keepAlive: true,
+              onPositionChanged: (position, hasGesture) {
+                if (hasGesture) {
+                  setState(() => _isMapMoving = true);
+                  Future.delayed(Duration(milliseconds: 150), () {
+                    if (mounted) {
+                      setState(() => _isMapMoving = false);
+                    }
+                  });
+                }
+              },
             ),
             children: [
               TileLayer(
@@ -104,31 +133,10 @@ class _HomePageState extends State<HomePage> {
                 subdomains: ['a', 'b', 'c'],
                 userAgentPackageName: 'com.example.turinGoFrontend',
               ),
-              if (showTraffic)
-                FutureBuilder<List<TrafficPoint>>(
-                  future: trafficData,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return Center(child: Text('No traffic data available'));
-                    } else {
-                      List<TrafficPoint> segments = snapshot.data!;
-                      List<Polyline> polylines = segments.map((segment) {
-                        return Polyline(
-                          points: [segment.start, segment.end],
-                          strokeWidth: 4.0,
-                          color: getColorWithFlowRate(segment.flow),
-                        );
-                      }).toList();
-
-                      return PolylineLayer(
-                        polylines: polylines,
-                      );
-                    }
-                  },
+              if (showTraffic && !_isMapMoving)
+                PolylineLayer(
+                  polylines: _trafficPolylines,
+                  polylineCulling: true,
                 ),
               if (_currentPosition != null)
                 MarkerLayer(

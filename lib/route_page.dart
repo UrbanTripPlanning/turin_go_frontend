@@ -91,7 +91,7 @@ class RoutePageState extends State<RoutePage> {
   }
 
   LatLng _calculateCenter() {
-    if (currentRoutePoints.isEmpty) return LatLng(45.09298, 7.67773);
+    if (currentRoutePoints.isEmpty) return LatLng(45.06288, 7.66277);
     
     double centerLat = 0;
     double centerLng = 0;
