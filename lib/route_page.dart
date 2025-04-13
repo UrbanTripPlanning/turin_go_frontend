@@ -39,8 +39,6 @@ class RoutePageState extends State<RoutePage> {
   MapController mapController = MapController();
   DateTime selectedDateTime = DateTime.now();
   TimeSelectionMode timeMode = TimeSelectionMode.leaveNow;
-  bool showDatePicker = false;
-  bool showTimePicker = false;
 
   @override
   void initState() {
@@ -102,42 +100,44 @@ class RoutePageState extends State<RoutePage> {
     }
   }
 
-  void _onDateSelected(DateTime date) {
-    setState(() {
-      selectedDateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        selectedDateTime.hour,
-        selectedDateTime.minute,
-      );
-      showDatePicker = false;
-    });
-    _searchRoute();
-  }
-
-  void _onTimeSelected(TimeOfDay time) {
-    setState(() {
-      selectedDateTime = DateTime(
-        selectedDateTime.year,
-        selectedDateTime.month,
-        selectedDateTime.day,
-        time.hour,
-        time.minute,
-      );
-      showTimePicker = false;
-    });
-    _searchRoute();
-  }
-
-  List<TimeOfDay> _generateTimeSlots() {
-    List<TimeOfDay> slots = [];
-    for (int hour = 0; hour < 24; hour++) {
-      for (int minute = 0; minute < 60; minute += 30) {
-        slots.add(TimeOfDay(hour: hour, minute: minute));
-      }
+  void _showDatePicker() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDateTime,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(Duration(days: 7)),
+    );
+    if (picked != null) {
+      setState(() {
+        selectedDateTime = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          selectedDateTime.hour,
+          selectedDateTime.minute,
+        );
+      });
+      _searchRoute();
     }
-    return slots;
+  }
+
+  void _showTimePicker() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+    );
+    if (picked != null) {
+      setState(() {
+        selectedDateTime = DateTime(
+          selectedDateTime.year,
+          selectedDateTime.month,
+          selectedDateTime.day,
+          picked.hour,
+          picked.minute,
+        );
+      });
+      _searchRoute();
+    }
   }
 
   LatLng _calculateCenter() {
@@ -262,24 +262,14 @@ class RoutePageState extends State<RoutePage> {
                         child: Row(
                           children: [
                             TextButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  showDatePicker = !showDatePicker;
-                                  showTimePicker = false;
-                                });
-                              },
+                              onPressed: _showDatePicker,
                               icon: Icon(Icons.calendar_today),
                               label: Text(
                                 "${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}",
                               ),
                             ),
                             TextButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  showTimePicker = !showTimePicker;
-                                  showDatePicker = false;
-                                });
-                              },
+                              onPressed: _showTimePicker,
                               icon: Icon(Icons.access_time),
                               label: Text(
                                 "${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}",
@@ -291,44 +281,6 @@ class RoutePageState extends State<RoutePage> {
                     ],
                   ],
                 ),
-                if (showDatePicker)
-                  Container(
-                    height: 250,
-                    margin: EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: CalendarDatePicker(
-                      initialDate: selectedDateTime,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(Duration(days: 7)),
-                      onDateChanged: _onDateSelected,
-                    ),
-                  ),
-                if (showTimePicker)
-                  Container(
-                    height: 150,
-                    margin: EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ListView.builder(
-                      itemCount: _generateTimeSlots().length,
-                      itemBuilder: (context, index) {
-                        final time = _generateTimeSlots()[index];
-                        return ListTile(
-                          dense: true,
-                          title: Text(
-                            "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}",
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          onTap: () => _onTimeSelected(time),
-                        );
-                      },
-                    ),
-                  ),
               ],
             ),
           ),
