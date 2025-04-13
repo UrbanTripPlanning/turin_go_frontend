@@ -6,12 +6,13 @@ class RoadApi {
   static Future<Map<String, dynamic>> searchRoute({
     required List<double> start,
     required List<double> end,
-    int? timestamp
+    int? startAt,
+    int? endAt,
   }) async {
     final response = await http.get(
       Uri.parse('${Config.baseURL}/route/search').replace(queryParameters: {
-        'start_at': (timestamp ?? DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
-        'end_at': '0',
+        'start_at': (startAt ?? 0).toString(),
+        'end_at': (endAt ?? 0).toString(),
         'src_loc': start.map((e) => e.toString()).toList(),
         'dst_loc': end.map((e) => e.toString()).toList(),
       }),

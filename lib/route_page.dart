@@ -3,6 +3,12 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'api/road.dart';
 
+enum TimeSelectionMode {
+  leaveNow,
+  departAt,
+  arriveBy,
+}
+
 class RoutePage extends StatefulWidget {
   final String startName;
   final String endName;
@@ -31,6 +37,10 @@ class RoutePageState extends State<RoutePage> {
   String? drivingRouteInfo;
   String? get currentRouteInfo => _isWalking ? walkingRouteInfo : drivingRouteInfo;
   MapController mapController = MapController();
+  DateTime selectedDateTime = DateTime.now();
+  TimeSelectionMode timeMode = TimeSelectionMode.leaveNow;
+  bool showDatePicker = false;
+  bool showTimePicker = false;
 
   @override
   void initState() {
@@ -48,6 +58,8 @@ class RoutePageState extends State<RoutePage> {
       final result = await RoadApi.searchRoute(
         start: widget.startCoord,
         end: widget.endCoord,
+        startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+        endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
       );
 
       setState(() {
@@ -88,6 +100,44 @@ class RoutePageState extends State<RoutePage> {
         isLoading = false;
       });
     }
+  }
+
+  void _onDateSelected(DateTime date) {
+    setState(() {
+      selectedDateTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        selectedDateTime.hour,
+        selectedDateTime.minute,
+      );
+      showDatePicker = false;
+    });
+    _searchRoute();
+  }
+
+  void _onTimeSelected(TimeOfDay time) {
+    setState(() {
+      selectedDateTime = DateTime(
+        selectedDateTime.year,
+        selectedDateTime.month,
+        selectedDateTime.day,
+        time.hour,
+        time.minute,
+      );
+      showTimePicker = false;
+    });
+    _searchRoute();
+  }
+
+  List<TimeOfDay> _generateTimeSlots() {
+    List<TimeOfDay> slots = [];
+    for (int hour = 0; hour < 24; hour++) {
+      for (int minute = 0; minute < 60; minute += 30) {
+        slots.add(TimeOfDay(hour: hour, minute: minute));
+      }
+    }
+    return slots;
   }
 
   LatLng _calculateCenter() {
@@ -174,6 +224,111 @@ class RoutePageState extends State<RoutePage> {
                     ),
                   ],
                 ),
+                SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      width: 120,
+                      child: DropdownButton<TimeSelectionMode>(
+                        value: timeMode,
+                        isExpanded: true,
+                        items: [
+                          DropdownMenuItem(
+                            value: TimeSelectionMode.leaveNow,
+                            child: Text("Leave Now"),
+                          ),
+                          DropdownMenuItem(
+                            value: TimeSelectionMode.departAt,
+                            child: Text("Depart at"),
+                          ),
+                          DropdownMenuItem(
+                            value: TimeSelectionMode.arriveBy,
+                            child: Text("Arrive by"),
+                          ),
+                        ],
+                        onChanged: (TimeSelectionMode? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              timeMode = newValue;
+                            });
+                            _searchRoute();
+                          }
+                        },
+                      ),
+                    ),
+                    if (timeMode != TimeSelectionMode.leaveNow) ...[
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  showDatePicker = !showDatePicker;
+                                  showTimePicker = false;
+                                });
+                              },
+                              icon: Icon(Icons.calendar_today),
+                              label: Text(
+                                "${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}",
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  showTimePicker = !showTimePicker;
+                                  showDatePicker = false;
+                                });
+                              },
+                              icon: Icon(Icons.access_time),
+                              label: Text(
+                                "${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}",
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (showDatePicker)
+                  Container(
+                    height: 250,
+                    margin: EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: CalendarDatePicker(
+                      initialDate: selectedDateTime,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(Duration(days: 7)),
+                      onDateChanged: _onDateSelected,
+                    ),
+                  ),
+                if (showTimePicker)
+                  Container(
+                    height: 150,
+                    margin: EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.builder(
+                      itemCount: _generateTimeSlots().length,
+                      itemBuilder: (context, index) {
+                        final time = _generateTimeSlots()[index];
+                        return ListTile(
+                          dense: true,
+                          title: Text(
+                            "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}",
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          onTap: () => _onTimeSelected(time),
+                        );
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
