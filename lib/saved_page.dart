@@ -7,7 +7,7 @@ class SavedPage extends StatefulWidget {
 }
 
 class SavedPageState extends State<SavedPage> {
-  List<Map<String, String>> plans = [];
+  List<Map<String, dynamic>> planList = [];
   bool isLoading = false;
   String? errorMessage;
 
@@ -19,16 +19,16 @@ class SavedPageState extends State<SavedPage> {
 
   Future<void> _getPlanList() async {
     setState(() {
+      planList = [];
       isLoading = true;
       errorMessage = null;
     });
 
     try {
       final result = await RoadApi.listRoute(userId: 0);
-
       setState(() {
-        List planList = result['data'];
-        print(planList);
+        planList = List<Map<String, dynamic>>.from(result['data']);
+        isLoading = false;
       });
     } catch (e) {
       setState(() {
@@ -37,6 +37,17 @@ class SavedPageState extends State<SavedPage> {
       });
     }
   }
+
+  List _getLeaveTime(Map trip) {
+      String dt;
+      if (trip['time_mode'] == '1') {
+        dt = DateTime.fromMillisecondsSinceEpoch(trip['start_at'] * 1000).toLocal().toString();
+      } else {
+        dt =  DateTime.fromMillisecondsSinceEpoch((trip['end_at'] - trip['spend_time'] * 60) * 1000).toLocal().toString();
+      }
+
+      return [dt.split(' ')[0], dt.split(' ')[1].substring(0, 5)];
+  }
   
 
   @override
@@ -44,21 +55,21 @@ class SavedPageState extends State<SavedPage> {
     return Scaffold(
       body: ListView.builder(
         padding: EdgeInsets.all(10),
-        itemCount: plans.length,
+        itemCount: planList.length,
         itemBuilder: (context, index) {
-          final trip = plans[index];
+          final trip = planList[index];
           return Card(
             margin: EdgeInsets.only(bottom: 10),
             child: ListTile(
-              title: Text('To: ${trip['title']}', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: Text('To: ${trip['dst_name']}', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Padding(
                 padding: EdgeInsets.symmetric(vertical: 5),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Leave by ${trip['leave']} on weekdays'),
-                    Text('From ${trip['from']} To ${trip['to']}'),
-                    Text('Duration: ${trip['duration']}  By ${trip['mode']}'),
+                    Text('Leave by ${_getLeaveTime(trip)[0]} ${_getLeaveTime(trip)[1]}'),
+                    Text('From ${trip['src_name']} To ${trip['dst_name']}'),
+                    Text('Duration: ${trip['spend_time']}  By ${trip['route_mode'] == '0' ? 'walking' : 'driving'}'),
                   ],
                 ),
               ),
@@ -81,7 +92,7 @@ class SavedPageState extends State<SavedPage> {
           ).then((newTrip) {
             if (newTrip != null) {
               setState(() {
-                plans.add(newTrip);
+                planList.add(newTrip);
               });
             }
           });
@@ -120,7 +131,7 @@ class AddTripPageState extends State<AddTripPage> {
           child: ListView(
             children: [
               TextFormField(
-                decoration: InputDecoration(labelText: "Name", hintText: "Enter trip’s name (optional)"),
+                decoration: InputDecoration(labelText: "Name", hintText: "Enter trip's name (optional)"),
                 onChanged: (value) => setState(() => tripName = value),
               ),
               SizedBox(height: 10),

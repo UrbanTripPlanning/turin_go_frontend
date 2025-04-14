@@ -160,6 +160,9 @@ class RoutePageState extends State<RoutePage> {
         end: widget.endCoord,
         spendTime: _isWalking ? walkingMinutes : drivingMinutes,
         timeMode: timeMode.index,
+        startName: widget.startName,
+        endName: widget.endName,
+        routeMode: _isWalking ? 0 : 1,
         startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
         endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
       );
@@ -268,7 +271,7 @@ class RoutePageState extends State<RoutePage> {
                 SizedBox(height: 10),
                 Row(
                   children: [
-                    Container(
+                    SizedBox(
                       width: 120,
                       child: DropdownButton<TimeSelectionMode>(
                         value: timeMode,

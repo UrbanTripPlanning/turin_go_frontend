@@ -31,6 +31,9 @@ class RoadApi {
     required List<double> end,
     required int spendTime,
     required int timeMode,
+    required String startName,
+    required String endName,
+    required int routeMode,
     int? startAt,
     int? endAt,
   }) async {
@@ -41,8 +44,11 @@ class RoadApi {
         'end_at': (endAt ?? 0).toString(),
         'src_loc': start.map((e) => e.toString()).toList(),
         'dst_loc': end.map((e) => e.toString()).toList(),
+        'src_name': startName,
+        'dst_name': endName,
         'spend_time': spendTime.toString(),
-        'time_mode': timeMode.toString()
+        'time_mode': timeMode.toString(),
+        'route_mode': routeMode.toString()
       }),
     );
 
