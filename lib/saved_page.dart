@@ -1,21 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:turin_go_frontend/api/road.dart';
 
 class SavedPage extends StatefulWidget {
   @override
-  _SavedPageState createState() => _SavedPageState();
+  SavedPageState createState() => SavedPageState();
 }
 
-class _SavedPageState extends State<SavedPage> {
-  List<Map<String, String>> trips = [];
+class SavedPageState extends State<SavedPage> {
+  List<Map<String, String>> plans = [];
+  bool isLoading = false;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _getPlanList();
+  }
+
+  Future<void> _getPlanList() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final result = await RoadApi.listRoute(userId: 0);
+
+      setState(() {
+        List planList = result['data'];
+        print(planList);
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Failed to load route: ${e.toString()}';
+        isLoading = false;
+      });
+    }
+  }
+  
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: ListView.builder(
         padding: EdgeInsets.all(10),
-        itemCount: trips.length,
+        itemCount: plans.length,
         itemBuilder: (context, index) {
-          final trip = trips[index];
+          final trip = plans[index];
           return Card(
             margin: EdgeInsets.only(bottom: 10),
             child: ListTile(
@@ -50,7 +81,7 @@ class _SavedPageState extends State<SavedPage> {
           ).then((newTrip) {
             if (newTrip != null) {
               setState(() {
-                trips.add(newTrip);
+                plans.add(newTrip);
               });
             }
           });
@@ -63,10 +94,10 @@ class _SavedPageState extends State<SavedPage> {
 
 class AddTripPage extends StatefulWidget {
   @override
-  _AddTripPageState createState() => _AddTripPageState();
+  AddTripPageState createState() => AddTripPageState();
 }
 
-class _AddTripPageState extends State<AddTripPage> {
+class AddTripPageState extends State<AddTripPage> {
   final _formKey = GlobalKey<FormState>();
   String? tripName;
   String from = '';
@@ -154,8 +185,11 @@ class _AddTripPageState extends State<AddTripPage> {
                       selected: isSelected,
                       onSelected: (selected) {
                         setState(() {
-                          if (selected) selectedDays.add(day);
-                          else selectedDays.remove(day);
+                          if (selected) {
+                            selectedDays.add(day);
+                          } else {
+                            selectedDays.remove(day);
+                          }
                         });
                       },
                     );
@@ -217,11 +251,11 @@ class _AddTripPageState extends State<AddTripPage> {
                     });
                   }
                 },
-                child: Text("Save Trip"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[200],
                   foregroundColor: Colors.black,
                 ),
+                child: Text("Save Trip"),
               ),
             ],
           ),

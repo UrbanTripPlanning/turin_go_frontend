@@ -52,4 +52,20 @@ class RoadApi {
       throw Exception('Failed to save route data');
     }
   }
+
+  static Future<Map<String, dynamic>> listRoute({
+    required int userId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${Config.baseURL}/route/list').replace(queryParameters: {
+        'user_id': userId.toString(),
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to list route data');
+    }
+  }
 }
