@@ -24,4 +24,32 @@ class RoadApi {
       throw Exception('Failed to search route data');
     }
   }
+
+  static Future<Map<String, dynamic>> saveRoute({
+    required int userId,
+    required List<double> start,
+    required List<double> end,
+    required int spendTime,
+    required int timeMode,
+    int? startAt,
+    int? endAt,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${Config.baseURL}/route/save').replace(queryParameters: {
+        'user_id': userId.toString(),
+        'start_at': (startAt ?? 0).toString(),
+        'end_at': (endAt ?? 0).toString(),
+        'src_loc': start.map((e) => e.toString()).toList(),
+        'dst_loc': end.map((e) => e.toString()).toList(),
+        'spend_time': spendTime.toString(),
+        'time_mode': timeMode.toString()
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to save route data');
+    }
+  }
 }

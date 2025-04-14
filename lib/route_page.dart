@@ -32,9 +32,13 @@ class RoutePageState extends State<RoutePage> {
   List<LatLng> get currentRoutePoints => _isWalking ? walkingRoutePoints : drivingRoutePoints;
   bool _isWalking = true;
   bool isLoading = false;
+  bool isSaved = false;
+  bool isSaving = false;
   String? errorMessage;
   String? walkingRouteInfo;
   String? drivingRouteInfo;
+  int drivingMinutes = 0;
+  int walkingMinutes = 0;
   String? get currentRouteInfo => _isWalking ? walkingRouteInfo : drivingRouteInfo;
   MapController mapController = MapController();
   DateTime selectedDateTime = DateTime.now();
@@ -87,9 +91,12 @@ class RoutePageState extends State<RoutePage> {
         } else {
           drivingDistanceStr = "${(drivingData['distances']/1000).toStringAsFixed(1)} km";
         }
+        walkingMinutes = walkingData['times'];
+        drivingMinutes = drivingData['times'];
 
-        walkingRouteInfo = "${walkingData['times']} min ($walkingDistanceStr)";
-        drivingRouteInfo = "${drivingData['times']} min ($drivingDistanceStr)";
+        walkingRouteInfo = "$walkingMinutes min ($walkingDistanceStr)";
+        drivingRouteInfo = "$drivingMinutes min ($drivingDistanceStr)";
+        isSaved = false;
         isLoading = false;
       });
     } catch (e) {
@@ -138,6 +145,40 @@ class RoutePageState extends State<RoutePage> {
       });
       _searchRoute();
     }
+  }
+
+  void _saveRoutePlan() async {
+    setState(() {
+      isSaving = true;
+      errorMessage = null;
+    });
+
+    try {
+      final result = await RoadApi.saveRoute(
+        userId: 0,
+        start: widget.startCoord,
+        end: widget.endCoord,
+        spendTime: _isWalking ? walkingMinutes : drivingMinutes,
+        timeMode: timeMode.index,
+        startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+        endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+      );
+
+      setState(() {
+        isSaving = false;
+        if (result['data'] == null) {
+          isSaved = true;
+        } else {
+          errorMessage = 'Failed to save route plan: ${result['data']}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Failed to save route plan: ${e.toString()}';
+        isSaving = false;
+      });
+    }
+
   }
 
   LatLng _calculateCenter() {
@@ -279,6 +320,13 @@ class RoutePageState extends State<RoutePage> {
                         ),
                       ),
                     ],
+                    Spacer(),
+                    if (timeMode != TimeSelectionMode.leaveNow && !isSaved)
+                      ElevatedButton(
+                        onPressed: isSaving ? null : _saveRoutePlan,
+                        child: Text("Save")
+                      ),
+                    SizedBox(width: 20),
                   ],
                 ),
               ],
@@ -338,14 +386,6 @@ class RoutePageState extends State<RoutePage> {
                 Text(
                   currentRouteInfo ?? "Loading route information...",
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton(onPressed: () {}, child: Text("Save")),
-                    SizedBox(width: 10),
-                    ElevatedButton(onPressed: () {}, child: Text("Add stops")),
-                  ],
                 ),
               ],
             ),
