@@ -40,7 +40,7 @@ class SavedPageState extends State<SavedPage> {
 
   List _getLeaveTime(Map trip) {
       String dt;
-      if (trip['time_mode'] == '1') {
+      if (trip['time_mode'] == 1) {
         dt = DateTime.fromMillisecondsSinceEpoch(trip['start_at'] * 1000).toLocal().toString();
       } else {
         dt =  DateTime.fromMillisecondsSinceEpoch((trip['end_at'] - trip['spend_time'] * 60) * 1000).toLocal().toString();
@@ -58,6 +58,7 @@ class SavedPageState extends State<SavedPage> {
         itemCount: planList.length,
         itemBuilder: (context, index) {
           final trip = planList[index];
+          final leaveTime = _getLeaveTime(trip);
           return Card(
             margin: EdgeInsets.only(bottom: 10),
             child: ListTile(
@@ -67,9 +68,9 @@ class SavedPageState extends State<SavedPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Leave by ${_getLeaveTime(trip)[0]} ${_getLeaveTime(trip)[1]}'),
+                    Text('Leave by ${leaveTime[0]} ${leaveTime[1]}'),
                     Text('From ${trip['src_name']} To ${trip['dst_name']}'),
-                    Text('Duration: ${trip['spend_time']}  By ${trip['route_mode'] == '0' ? 'walking' : 'driving'}'),
+                    Text('Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == '0' ? 'walking' : 'driving'}'),
                   ],
                 ),
               ),
