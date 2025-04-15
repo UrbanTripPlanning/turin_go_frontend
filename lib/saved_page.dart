@@ -39,21 +39,25 @@ class SavedPageState extends State<SavedPage> {
   }
 
   List _getLeaveTime(Map trip) {
-      String dt;
-      if (trip['time_mode'] == 1) {
-        dt = DateTime.fromMillisecondsSinceEpoch(trip['start_at'] * 1000).toLocal().toString();
-      } else {
-        dt =  DateTime.fromMillisecondsSinceEpoch((trip['end_at'] - trip['spend_time'] * 60) * 1000).toLocal().toString();
-      }
+    String dt;
+    if (trip['time_mode'] == 1) {
+      dt = DateTime.fromMillisecondsSinceEpoch(trip['start_at'] * 1000).toLocal().toString();
+    } else {
+      dt = DateTime.fromMillisecondsSinceEpoch((trip['end_at'] - trip['spend_time'] * 60) * 1000).toLocal().toString();
+    }
 
-      return [dt.split(' ')[0], dt.split(' ')[1].substring(0, 5)];
+    return [dt.split(' ')[0], dt.split(' ')[1].substring(0, 5)];
   }
-  
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListView.builder(
+      appBar: AppBar(title: Text('Saved Trips')),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : errorMessage != null
+          ? Center(child: Text(errorMessage!, style: TextStyle(color: Colors.red)))
+          : ListView.builder(
         padding: EdgeInsets.all(10),
         itemCount: planList.length,
         itemBuilder: (context, index) {
@@ -91,10 +95,8 @@ class SavedPageState extends State<SavedPage> {
             context,
             MaterialPageRoute(builder: (context) => AddTripPage()),
           ).then((newTrip) {
-            if (newTrip != null) {
-              setState(() {
-                planList.add(newTrip);
-              });
+            if (newTrip == true) {
+              _getPlanList(); // reload saved trips
             }
           });
         },
@@ -120,6 +122,7 @@ class AddTripPageState extends State<AddTripPage> {
   DateTime? specificDate;
   bool isUsingSpecificDate = false;
   String transport = 'Walking';
+  bool isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +130,9 @@ class AddTripPageState extends State<AddTripPage> {
       appBar: AppBar(title: Text('Add Trip')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
+        child: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : Form(
           key: _formKey,
           child: ListView(
             children: [
@@ -138,13 +143,13 @@ class AddTripPageState extends State<AddTripPage> {
               SizedBox(height: 10),
               TextFormField(
                 decoration: InputDecoration(labelText: 'From'),
-                initialValue: from,
                 onChanged: (value) => setState(() => from = value),
+                validator: (value) => value == null || value.isEmpty ? 'Please enter a starting point' : null,
               ),
               TextFormField(
                 decoration: InputDecoration(labelText: 'To'),
-                initialValue: to,
                 onChanged: (value) => setState(() => to = value),
+                validator: (value) => value == null || value.isEmpty ? 'Please enter a destination' : null,
               ),
               SizedBox(height: 20),
               Text("Time Preferences", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -190,7 +195,7 @@ class AddTripPageState extends State<AddTripPage> {
               if (!isUsingSpecificDate)
                 Wrap(
                   spacing: 10,
-                  children: ['Mon','Tues','Wed','Thurs','Fri','Sat','Sun'].map((day) {
+                  children: ['Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'].map((day) {
                     final isSelected = selectedDays.contains(day);
                     return FilterChip(
                       label: Text(day),
@@ -251,16 +256,42 @@ class AddTripPageState extends State<AddTripPage> {
               ),
               SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    Navigator.pop(context, {
-                      'title': tripName ?? '',
-                      'leave': leaveTime != null ? leaveTime!.format(context) : '',
-                      'from': from,
-                      'to': to,
-                      'duration': '15 minutes',
-                      'mode': transport.toLowerCase(),
-                    });
+                    setState(() => isLoading = true);
+
+                    try {
+                      final now = DateTime.now();
+                      final leaveDateTime = leaveTime != null
+                          ? DateTime(now.year, now.month, now.day, leaveTime!.hour, leaveTime!.minute)
+                          : now;
+
+                      final startAt = isLeaveTime ? leaveDateTime.millisecondsSinceEpoch ~/ 1000 : null;
+                      final endAt = !isLeaveTime ? leaveDateTime.millisecondsSinceEpoch ~/ 1000 : null;
+
+                      final result = await RoadApi.saveRoute(
+                        userId: 0,
+                        start: [45.0, 7.0], // Replace with real coordinates if available
+                        end: [45.1, 7.1],
+                        spendTime: 15,
+                        timeMode: isLeaveTime ? 1 : 0,
+                        startName: from,
+                        endName: to,
+                        routeMode: transport.toLowerCase() == 'walking' ? 0 : 1,
+                        startAt: startAt,
+                        endAt: endAt,
+                      );
+
+                      if (result['data'] == null) {
+                        Navigator.pop(context, true); // trip saved
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save trip')));
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    } finally {
+                      setState(() => isLoading = false);
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -276,4 +307,3 @@ class AddTripPageState extends State<AddTripPage> {
     );
   }
 }
-
