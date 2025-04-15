@@ -70,7 +70,7 @@ class SavedPageState extends State<SavedPage> {
                   children: [
                     Text('Leave by ${leaveTime[0]} ${leaveTime[1]}'),
                     Text('From ${trip['src_name']} To ${trip['dst_name']}'),
-                    Text('Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == '0' ? 'walking' : 'driving'}'),
+                    Text('Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == 0 ? 'walking' : 'driving'}'),
                   ],
                 ),
               ),
