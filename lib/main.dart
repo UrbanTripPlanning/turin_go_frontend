@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
 import 'saved_page.dart';
+import 'settings_page.dart';
 
 void main() {
   runApp(MyApp());
@@ -31,7 +32,7 @@ class MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     HomePage(),
     SavedPage(),
-    Placeholder(),
+    SettingsPage(),
   ];
 
   void _onItemTapped(int index) {
