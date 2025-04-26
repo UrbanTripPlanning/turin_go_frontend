@@ -26,7 +26,7 @@ class RoadApi {
   }
 
   static Future<Map<String, dynamic>> saveRoute({
-    required int userId,
+    required String userId,
     required List<double> start,
     required List<double> end,
     required int spendTime,
@@ -34,11 +34,13 @@ class RoadApi {
     required String startName,
     required String endName,
     required int routeMode,
+    String? planId,
     int? startAt,
     int? endAt,
   }) async {
     final response = await http.get(
       Uri.parse('${Config.baseURL}/route/save').replace(queryParameters: {
+        'plan_id': planId ?? '',
         'user_id': userId.toString(),
         'start_at': (startAt ?? 0).toString(),
         'end_at': (endAt ?? 0).toString(),
@@ -60,7 +62,7 @@ class RoadApi {
   }
 
   static Future<Map<String, dynamic>> listRoute({
-    required int userId,
+    required String userId,
   }) async {
     final response = await http.get(
       Uri.parse('${Config.baseURL}/route/list').replace(queryParameters: {

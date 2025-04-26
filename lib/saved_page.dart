@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
 
 class SavedPage extends StatefulWidget {
@@ -7,6 +8,7 @@ class SavedPage extends StatefulWidget {
 }
 
 class SavedPageState extends State<SavedPage> {
+  String? userId;
   List<Map<String, dynamic>> planList = [];
   bool isLoading = false;
   String? errorMessage;
@@ -14,6 +16,15 @@ class SavedPageState extends State<SavedPage> {
   @override
   void initState() {
     super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      userId = prefs.getString('userId');
+    });
     _getPlanList();
   }
 
@@ -25,7 +36,7 @@ class SavedPageState extends State<SavedPage> {
     });
 
     try {
-      final result = await RoadApi.listRoute(userId: 0);
+      final result = await RoadApi.listRoute(userId: userId ?? '');
       setState(() {
         planList = List<Map<String, dynamic>>.from(result['data']);
         isLoading = false;
@@ -270,7 +281,7 @@ class AddTripPageState extends State<AddTripPage> {
                       final endAt = !isLeaveTime ? leaveDateTime.millisecondsSinceEpoch ~/ 1000 : null;
 
                       final result = await RoadApi.saveRoute(
-                        userId: 0,
+                        userId: '',
                         start: [45.0, 7.0], // Replace with real coordinates if available
                         end: [45.1, 7.1],
                         spendTime: 15,

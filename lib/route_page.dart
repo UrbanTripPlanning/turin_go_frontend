@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import 'api/road.dart';
 
@@ -27,6 +28,8 @@ class RoutePage extends StatefulWidget {
 }
 
 class RoutePageState extends State<RoutePage> {
+  String? userId;
+  String? planId;
   List<LatLng> walkingRoutePoints = [];
   List<LatLng> drivingRoutePoints = [];
   List<LatLng> get currentRoutePoints => _isWalking ? walkingRoutePoints : drivingRoutePoints;
@@ -48,6 +51,16 @@ class RoutePageState extends State<RoutePage> {
   void initState() {
     super.initState();
     _searchRoute();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      userId = prefs.getString('userId');
+      // TODO: planId
+    });
   }
 
   Future<void> _searchRoute() async {
@@ -153,9 +166,14 @@ class RoutePageState extends State<RoutePage> {
       errorMessage = null;
     });
 
+    if (userId == null) {
+      // TODO: local saved
+      return;
+    }
+
     try {
       final result = await RoadApi.saveRoute(
-        userId: 0,
+        userId: userId ?? '',
         start: widget.startCoord,
         end: widget.endCoord,
         spendTime: _isWalking ? walkingMinutes : drivingMinutes,
