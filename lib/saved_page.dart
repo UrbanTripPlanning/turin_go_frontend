@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
+import 'route_page.dart';
 
 class SavedPage extends StatefulWidget {
   @override
@@ -37,11 +38,13 @@ class SavedPageState extends State<SavedPage> {
 
     try {
       final result = await RoadApi.listRoute(userId: userId ?? '');
+      if (!mounted) return;
       setState(() {
         planList = List<Map<String, dynamic>>.from(result['data']);
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         errorMessage = 'Failed to load route: ${e.toString()}';
         isLoading = false;
@@ -89,6 +92,20 @@ class SavedPageState extends State<SavedPage> {
                   ],
                 ),
               ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RoutePage(
+                      startName: trip['src_name'],
+                      endName: trip['dst_name'],
+                      startCoord: (trip['src_loc'] as List).map((e) => (e as num).toDouble()).toList(),
+                      endCoord: (trip['dst_loc'] as List).map((e) => (e as num).toDouble()).toList(),
+                      planId: trip['plan_id'],
+                    ),
+                  ),
+                );
+              },
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

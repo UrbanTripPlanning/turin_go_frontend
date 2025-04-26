@@ -15,12 +15,14 @@ class RoutePage extends StatefulWidget {
   final String endName;
   final List<double> startCoord;
   final List<double> endCoord;
+  final String? planId;
 
   RoutePage({
     required this.startName,
     required this.endName,
     required this.startCoord,
     required this.endCoord,
+    this.planId,
   });
 
   @override
@@ -29,7 +31,6 @@ class RoutePage extends StatefulWidget {
 
 class RoutePageState extends State<RoutePage> {
   String? userId;
-  String? planId;
   List<LatLng> walkingRoutePoints = [];
   List<LatLng> drivingRoutePoints = [];
   List<LatLng> get currentRoutePoints => _isWalking ? walkingRoutePoints : drivingRoutePoints;
@@ -59,7 +60,6 @@ class RoutePageState extends State<RoutePage> {
     if (!mounted) return;
     setState(() {
       userId = prefs.getString('userId');
-      // TODO: planId
     });
   }
 
@@ -173,6 +173,7 @@ class RoutePageState extends State<RoutePage> {
 
     try {
       final result = await RoadApi.saveRoute(
+        planId: widget.planId ?? '',
         userId: userId ?? '',
         start: widget.startCoord,
         end: widget.endCoord,
