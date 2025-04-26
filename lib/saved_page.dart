@@ -30,6 +30,7 @@ class SavedPageState extends State<SavedPage> {
   }
 
   Future<void> _getPlanList() async {
+    if (!mounted) return;
     setState(() {
       planList = [];
       isLoading = true;
@@ -102,6 +103,10 @@ class SavedPageState extends State<SavedPage> {
                       startCoord: (trip['src_loc'] as List).map((e) => (e as num).toDouble()).toList(),
                       endCoord: (trip['dst_loc'] as List).map((e) => (e as num).toDouble()).toList(),
                       planId: trip['plan_id'],
+                      routeMode: trip['route_mode'],
+                      timeMode: trip['time_mode'],
+                      startAt: trip['start_at'],
+                      endAt: trip['end_at'],
                     ),
                   ),
                 );

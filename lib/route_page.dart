@@ -16,6 +16,10 @@ class RoutePage extends StatefulWidget {
   final List<double> startCoord;
   final List<double> endCoord;
   final String? planId;
+  final int? routeMode;
+  final int? timeMode;
+  final int? startAt;
+  final int? endAt;
 
   RoutePage({
     required this.startName,
@@ -23,6 +27,10 @@ class RoutePage extends StatefulWidget {
     required this.startCoord,
     required this.endCoord,
     this.planId,
+    this.routeMode,
+    this.timeMode,
+    this.startAt,
+    this.endAt,
   });
 
   @override
@@ -33,8 +41,8 @@ class RoutePageState extends State<RoutePage> {
   String? userId;
   List<LatLng> walkingRoutePoints = [];
   List<LatLng> drivingRoutePoints = [];
+  late bool _isWalking;
   List<LatLng> get currentRoutePoints => _isWalking ? walkingRoutePoints : drivingRoutePoints;
-  bool _isWalking = true;
   bool isLoading = false;
   bool isSaved = false;
   bool isSaving = false;
@@ -45,12 +53,28 @@ class RoutePageState extends State<RoutePage> {
   int walkingMinutes = 0;
   String? get currentRouteInfo => _isWalking ? walkingRouteInfo : drivingRouteInfo;
   MapController mapController = MapController();
-  DateTime selectedDateTime = DateTime.now();
-  TimeSelectionMode timeMode = TimeSelectionMode.leaveNow;
+  late DateTime selectedDateTime;
+  late TimeSelectionMode timeMode;
 
   @override
   void initState() {
     super.initState();
+    _isWalking = widget.routeMode == null ? true : widget.routeMode == 0;
+    timeMode = TimeSelectionMode.values[widget.timeMode ?? 0];
+    switch (timeMode) {
+      case TimeSelectionMode.leaveNow:
+        selectedDateTime = DateTime.now();
+        break;
+      case TimeSelectionMode.arriveBy:
+        selectedDateTime = DateTime.fromMillisecondsSinceEpoch((widget.endAt ?? 0) * 1000);
+        break;
+      case TimeSelectionMode.departAt:
+        selectedDateTime = DateTime.fromMillisecondsSinceEpoch((widget.startAt ?? 0) * 1000);
+        break;
+      default:
+        selectedDateTime = DateTime.now();
+    }
+
     _searchRoute();
     _loadUserData();
   }
