@@ -36,6 +36,7 @@ class SettingsPageState extends State<SettingsPage> {
     setState(() {
       userId = prefs.getString('userId');
       username = prefs.getString('username') ?? '';
+      notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
     });
   }
 
@@ -54,12 +55,33 @@ class SettingsPageState extends State<SettingsPage> {
         await prefs.setString('userId', userId!);
         await prefs.setString('username', username);
 
-        print('Login successful: User ID = $userId');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully logged in as $username')),
+        );
       } else {
-        print('Login failed: ${result['message']}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: ${result['message']}')),
+        );
       }
     } catch (e) {
       print('Error during login: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error during login')),
+      );
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notificationsEnabled', notificationsEnabled);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Settings saved successfully')),
+      );
+    } catch (e) {
+      print('Error saving settings: $e');
     }
   }
 
@@ -71,54 +93,65 @@ class SettingsPageState extends State<SettingsPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Login', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            if (userId != null)
-              Text('Logged in as: $username', style: TextStyle(fontSize: 16))
-            else ...[
-              TextField(
-                controller: _usernameController,
-                decoration: InputDecoration(labelText: 'Username'),
-              ),
-              TextField(
-                controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  username = _usernameController.text;
-                  password = _passwordController.text;
-                  _login();
-                },
-                child: Text('Login'),
-              ),
-            ],
-            SizedBox(height: 20),
-            Text('Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            SwitchListTile(
-              title: Text('Enable Notifications'),
-              value: notificationsEnabled,
-              onChanged: (bool value) {
-                setState(() {
-                  notificationsEnabled = value;
-                });
-              },
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                print('Username: $username, Password: $password');
-                print('Notifications Enabled: $notificationsEnabled');
-              },
-              child: Text('Save Settings'),
-            ),
-          ],
-        ),
+        child: userId == null
+            ? _buildLoginSection()
+            : _buildSettingsSection(),
       ),
     );
   }
+
+  Widget _buildLoginSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Login', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        TextField(
+          controller: _usernameController,
+          decoration: InputDecoration(labelText: 'Username'),
+        ),
+        TextField(
+          controller: _passwordController,
+          decoration: InputDecoration(labelText: 'Password'),
+          obscureText: true,
+        ),
+        SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: () {
+            username = _usernameController.text;
+            password = _passwordController.text;
+            _login();
+          },
+          child: Text('Login'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Logged in as: $username', style: TextStyle(fontSize: 16)),
+        SizedBox(height: 20),
+        Divider(),
+        SizedBox(height: 10),
+        Text('Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        SwitchListTile(
+          title: Text('Enable Notifications'),
+          value: notificationsEnabled,
+          onChanged: (bool value) {
+            setState(() {
+              notificationsEnabled = value;
+            });
+          },
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _saveSettings,
+          child: Text('Save Settings'),
+        ),
+      ],
+    );
+  }
 }
+
