@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import 'api/road.dart';
+import 'search_page.dart'; // added to navigate to search page
 
 enum TimeSelectionMode {
   leaveNow,
@@ -56,11 +57,18 @@ class RoutePageState extends State<RoutePage> {
   late DateTime selectedDateTime;
   late TimeSelectionMode timeMode;
 
+  // Local variables for start point
+  late String startNameLocal;
+  late List<double> startCoordLocal;
+
   @override
   void initState() {
     super.initState();
     _isWalking = widget.routeMode == null ? true : widget.routeMode == 0;
     timeMode = TimeSelectionMode.values[widget.timeMode ?? 0];
+    startNameLocal = widget.startName;
+    startCoordLocal = widget.startCoord;
+
     switch (timeMode) {
       case TimeSelectionMode.leaveNow:
         selectedDateTime = DateTime.now();
@@ -71,8 +79,6 @@ class RoutePageState extends State<RoutePage> {
       case TimeSelectionMode.departAt:
         selectedDateTime = DateTime.fromMillisecondsSinceEpoch((widget.startAt ?? 0) * 1000);
         break;
-      default:
-        selectedDateTime = DateTime.now();
     }
 
     _searchRoute();
@@ -95,7 +101,7 @@ class RoutePageState extends State<RoutePage> {
 
     try {
       final result = await RoadApi.searchRoute(
-        start: widget.startCoord,
+        start: startCoordLocal,
         end: widget.endCoord,
         startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
         endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
@@ -104,35 +110,21 @@ class RoutePageState extends State<RoutePage> {
       setState(() {
         Map walkingData = result['data']['walking'];
         Map drivingData = result['data']['driving'];
-        List walkingRoutes = walkingData['routes'];
-        List drivingRoutes = drivingData['routes'];
-        
-        walkingRoutePoints = walkingRoutes.map((coord) => 
-          LatLng(coord[1].toDouble(), coord[0].toDouble())
-        ).toList();
 
-        drivingRoutePoints = drivingRoutes.map((coord) => 
-          LatLng(coord[1].toDouble(), coord[0].toDouble())
-        ).toList();
+        walkingRoutePoints = List<LatLng>.from(
+          walkingData['routes'].map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble())),
+        );
 
-        String walkingDistanceStr = "";
-        if (walkingData['distances'] < 1000) {
-          walkingDistanceStr = "${walkingData['distances']} m";
-        } else {
-          walkingDistanceStr = "${(walkingData['distances']/1000).toStringAsFixed(1)} km";
-        }
+        drivingRoutePoints = List<LatLng>.from(
+          drivingData['routes'].map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble())),
+        );
 
-        String drivingDistanceStr = "";
-        if (drivingData['distances'] < 1000) {
-          drivingDistanceStr = "${drivingData['distances']} m";
-        } else {
-          drivingDistanceStr = "${(drivingData['distances']/1000).toStringAsFixed(1)} km";
-        }
         walkingMinutes = walkingData['times'];
         drivingMinutes = drivingData['times'];
 
-        walkingRouteInfo = "$walkingMinutes min ($walkingDistanceStr)";
-        drivingRouteInfo = "$drivingMinutes min ($drivingDistanceStr)";
+        walkingRouteInfo = "${walkingMinutes} min (${_formatDistance(walkingData['distances'])})";
+        drivingRouteInfo = "${drivingMinutes} min (${_formatDistance(drivingData['distances'])})";
+
         isSaved = false;
         isLoading = false;
       });
@@ -141,6 +133,14 @@ class RoutePageState extends State<RoutePage> {
         errorMessage = 'Failed to load route: ${e.toString()}';
         isLoading = false;
       });
+    }
+  }
+
+  String _formatDistance(dynamic distanceMeters) {
+    if (distanceMeters < 1000) {
+      return "${distanceMeters} m";
+    } else {
+      return "${(distanceMeters / 1000).toStringAsFixed(1)} km";
     }
   }
 
@@ -191,19 +191,18 @@ class RoutePageState extends State<RoutePage> {
     });
 
     if (userId == null) {
-      // TODO: local saved
       return;
     }
 
     try {
       final result = await RoadApi.saveRoute(
         planId: widget.planId ?? '',
-        userId: userId ?? '',
-        start: widget.startCoord,
+        userId: userId!,
+        start: startCoordLocal,
         end: widget.endCoord,
         spendTime: _isWalking ? walkingMinutes : drivingMinutes,
         timeMode: timeMode.index,
-        startName: widget.startName,
+        startName: startNameLocal,
         endName: widget.endName,
         routeMode: _isWalking ? 0 : 1,
         startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
@@ -215,7 +214,7 @@ class RoutePageState extends State<RoutePage> {
         if (result['data'] == null) {
           isSaved = true;
         } else {
-          errorMessage = 'Failed to save route plan: ${result['data']}';
+          errorMessage = 'Failed to save route plan.';
         }
       });
     } catch (e) {
@@ -224,41 +223,30 @@ class RoutePageState extends State<RoutePage> {
         isSaving = false;
       });
     }
-
   }
 
   LatLng _calculateCenter() {
     if (currentRoutePoints.isEmpty) return LatLng(45.06288, 7.66277);
-    
-    double centerLat = 0;
-    double centerLng = 0;
-    
-    for (var point in currentRoutePoints) {
-      centerLat += point.latitude;
-      centerLng += point.longitude;
+    double lat = 0, lng = 0;
+    for (var p in currentRoutePoints) {
+      lat += p.latitude;
+      lng += p.longitude;
     }
-    
-    return LatLng(
-      centerLat / currentRoutePoints.length,
-      centerLng / currentRoutePoints.length
-    );
+    return LatLng(lat / currentRoutePoints.length, lng / currentRoutePoints.length);
   }
 
   double _calculateZoom() {
     if (currentRoutePoints.length < 2) return 13.0;
-    
-    double maxDistance = 0;
     final distance = Distance();
-    
+    double maxDist = 0;
     for (int i = 0; i < currentRoutePoints.length - 1; i++) {
       double d = distance.as(LengthUnit.Kilometer, currentRoutePoints[i], currentRoutePoints[i + 1]);
-      maxDistance = maxDistance > d ? maxDistance : d;
+      if (d > maxDist) maxDist = d;
     }
-
-    if (maxDistance > 10) return 11.0;
-    if (maxDistance > 5) return 12.0;
-    if (maxDistance > 2) return 13.0;
-    if (maxDistance > 1) return 14.0;
+    if (maxDist > 10) return 11.0;
+    if (maxDist > 5) return 12.0;
+    if (maxDist > 2) return 13.0;
+    if (maxDist > 1) return 14.0;
     return 15.0;
   }
 
@@ -288,10 +276,32 @@ class RoutePageState extends State<RoutePage> {
                   children: [
                     Text("From: ", style: TextStyle(fontWeight: FontWeight.bold)),
                     Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: widget.startName,
-                          border: OutlineInputBorder(),
+                      child: GestureDetector(
+                        onTap: () async {
+                          final selectedPlace = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SearchPage(isSelectingStartPoint: true),
+                            ),
+                          );
+                          if (selectedPlace != null) {
+                            setState(() {
+                              startNameLocal = selectedPlace['name_en'];
+                              startCoordLocal = [selectedPlace['Longitude'], selectedPlace['Latitude']];
+                            });
+                            _searchRoute();
+                          }
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            startNameLocal,
+                            style: TextStyle(fontSize: 16),
+                          ),
                         ),
                       ),
                     ),
@@ -307,6 +317,7 @@ class RoutePageState extends State<RoutePage> {
                           hintText: widget.endName,
                           border: OutlineInputBorder(),
                         ),
+                        enabled: false,
                       ),
                     ),
                   ],
@@ -351,16 +362,12 @@ class RoutePageState extends State<RoutePage> {
                             TextButton.icon(
                               onPressed: _showDatePicker,
                               icon: Icon(Icons.calendar_today),
-                              label: Text(
-                                "${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}",
-                              ),
+                              label: Text("${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}"),
                             ),
                             TextButton.icon(
                               onPressed: _showTimePicker,
                               icon: Icon(Icons.access_time),
-                              label: Text(
-                                "${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}",
-                              ),
+                              label: Text("${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}"),
                             ),
                           ],
                         ),
@@ -370,7 +377,7 @@ class RoutePageState extends State<RoutePage> {
                     if (timeMode != TimeSelectionMode.leaveNow && !isSaved)
                       ElevatedButton(
                         onPressed: isSaving ? null : _saveRoutePlan,
-                        child: Text("Save")
+                        child: Text("Save"),
                       ),
                     SizedBox(width: 20),
                   ],
@@ -427,13 +434,9 @@ class RoutePageState extends State<RoutePage> {
             ),
           Padding(
             padding: EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Text(
-                  currentRouteInfo ?? "Loading route information...",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
+            child: Text(
+              currentRouteInfo ?? "Loading route info...",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -441,3 +444,4 @@ class RoutePageState extends State<RoutePage> {
     );
   }
 }
+

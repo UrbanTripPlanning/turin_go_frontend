@@ -7,6 +7,10 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 
 class SearchPage extends StatefulWidget {
+  final bool isSelectingStartPoint;
+
+  SearchPage({this.isSelectingStartPoint = false});
+
   @override
   SearchPageState createState() => SearchPageState();
 }
@@ -28,7 +32,6 @@ class SearchPageState extends State<SearchPage> {
     _loadRecentSearches();
   }
 
-  // Load search history
   Future<void> _loadRecentSearches() async {
     final prefs = await SharedPreferences.getInstance();
     final searchesJson = prefs.getString(_recentSearchesKey);
@@ -90,25 +93,23 @@ class SearchPageState extends State<SearchPage> {
     }
   }
 
-  // Get user location
   Future<List<double>?> _getUserLocation() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final locationJson = prefs.getString(_locationKey);
-      
+
       if (locationJson != null) {
         final location = json.decode(locationJson);
         final timestamp = location['timestamp'] as int;
         final now = DateTime.now().millisecondsSinceEpoch;
-        
-        // If location data is older than 5 minutes, get new location
+
         if (now - timestamp > 5 * 60 * 1000) {
           return await _getCurrentLocation();
         }
-        
+
         return [location['longitude'], location['latitude']];
       }
-      
+
       return await _getCurrentLocation();
     } catch (e) {
       print('Error getting user location: $e');
@@ -116,20 +117,18 @@ class SearchPageState extends State<SearchPage> {
     }
   }
 
-  // Get current location
   Future<List<double>?> _getCurrentLocation() async {
     try {
       final position = await Geolocator.getCurrentPosition();
       final location = [position.longitude, position.latitude];
-      
-      // Update cache
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_locationKey, json.encode({
         'latitude': position.latitude,
         'longitude': position.longitude,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       }));
-      
+
       return location;
     } catch (e) {
       print('Error getting current location: $e');
@@ -187,28 +186,15 @@ class SearchPageState extends State<SearchPage> {
               child: ListView.builder(
                 itemCount: searchResults.isEmpty ? recentSearches.length : searchResults.length,
                 itemBuilder: (context, index) {
-                  if (searchResults.isEmpty) {
-                    final place = recentSearches[index];
-                    return ListTile(
-                      leading: Icon(Icons.history),
-                      title: Text(place['name_en']),
-                      subtitle: Text(place['name_it'] ?? ''),
-                      onTap: () async {
-                        final userLocation = await _getUserLocation();
-                        if (userLocation != null) {
-                          _navigateToRoute(place, userLocation);
-                        } else {
-                          _showError();
-                        }
-                      },
-                    );
-                  } else {
-                    final place = searchResults[index];
-                    return ListTile(
-                      leading: Icon(Icons.location_on),
-                      title: Text(place['name_en']),
-                      subtitle: Text(place['name_it'] ?? ''),
-                      onTap: () async {
+                  final place = searchResults.isEmpty ? recentSearches[index] : searchResults[index];
+                  return ListTile(
+                    leading: Icon(searchResults.isEmpty ? Icons.history : Icons.location_on),
+                    title: Text(place['name_en']),
+                    subtitle: Text(place['name_it'] ?? ''),
+                    onTap: () async {
+                      if (widget.isSelectingStartPoint) {
+                        Navigator.pop(context, place);
+                      } else {
                         _addToRecentSearches(place);
                         final userLocation = await _getUserLocation();
                         if (userLocation != null) {
@@ -216,9 +202,9 @@ class SearchPageState extends State<SearchPage> {
                         } else {
                           _showError();
                         }
-                      },
-                    );
-                  }
+                      }
+                    },
+                  );
                 },
               ),
             ),
@@ -235,3 +221,4 @@ class SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 }
+
