@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
 import 'route_page.dart';
+import 'dart:convert';
 
 class SavedPage extends StatefulWidget {
   @override
@@ -36,6 +37,23 @@ class SavedPageState extends State<SavedPage> {
       isLoading = true;
       errorMessage = null;
     });
+
+    if (userId == null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String>? savedPlans = prefs.getStringList('savedPlans');
+      List<Map<String, dynamic>> plans = [];
+      if (savedPlans != null) {
+        for (String plan in savedPlans) {
+          plans.add(Map<String, dynamic>.from(json.decode(plan)));
+        }
+      }
+
+      setState(() {
+        planList = plans;
+        isLoading = false;
+      });
+      return;
+    }
 
     try {
       final result = await RoadApi.listRoute(userId: userId ?? '');

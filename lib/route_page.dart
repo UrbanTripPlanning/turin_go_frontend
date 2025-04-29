@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import 'api/road.dart';
 import 'search_page.dart'; // added to navigate to search page
+import 'dart:convert';
 
 enum TimeSelectionMode {
   leaveNow,
@@ -191,6 +192,27 @@ class RoutePageState extends State<RoutePage> {
     });
 
     if (userId == null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<Map<String, dynamic>> savedPlans = prefs.getStringList('savedPlans')?.map((e) => Map<String, dynamic>.from(json.decode(e))).toList() ?? [];
+      
+      savedPlans.add({
+        'plan_id': 'local_',
+        'src_loc': startCoordLocal,
+        'dst_loc': widget.endCoord,
+        'spend_time': _isWalking ? walkingMinutes : drivingMinutes,
+        'time_mode': timeMode.index,
+        'src_name': startNameLocal,
+        'dst_name': widget.endName,
+        'route_mode': _isWalking ? 0 : 1,
+        'start_at': timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+        'end_at': timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+      });
+
+      await prefs.setStringList('savedPlans', savedPlans.map((e) => json.encode(e)).toList());
+      setState(() {
+        isSaving = false;
+        isSaved = true;
+      });
       return;
     }
 
