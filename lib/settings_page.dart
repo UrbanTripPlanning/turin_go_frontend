@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api/common.dart';
+import 'notification_service.dart'; // Make sure you have this!
 
 class SettingsPage extends StatefulWidget {
   @override
@@ -43,8 +44,8 @@ class SettingsPageState extends State<SettingsPage> {
   Future<void> _login() async {
     try {
       final result = await CommonApi.login(username: username, password: password);
-      if (!mounted) return;
       if (result['data'] != null) {
+        if (!mounted) return;
 
         setState(() {
           userId = result['data']['user_id'];
@@ -54,7 +55,7 @@ class SettingsPageState extends State<SettingsPage> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', userId!);
         await prefs.setString('username', username);
-        if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Successfully logged in as $username')),
         );
@@ -85,6 +86,15 @@ class SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _testNotification() async {
+    await Future.delayed(Duration(seconds: 5));
+    await NotificationService.showNotification(
+      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: 'Test Notification',
+      body: 'This is a test notification triggered after 5 seconds!',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,64 +103,68 @@ class SettingsPageState extends State<SettingsPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: userId == null
-            ? _buildLoginSection()
-            : _buildSettingsSection(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Login', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            if (userId != null)
+              Text('Logged in as: $username', style: TextStyle(fontSize: 16))
+            else ...[
+              TextField(
+                controller: _usernameController,
+                decoration: InputDecoration(labelText: 'Username'),
+              ),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  username = _usernameController.text;
+                  password = _passwordController.text;
+                  _login();
+                },
+                child: Text('Login'),
+              ),
+            ],
+            if (userId != null) ...[
+              SizedBox(height: 20),
+              Text('Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              SwitchListTile(
+                title: Text('Enable Notifications'),
+                value: notificationsEnabled,
+                onChanged: (bool value) async {
+                  setState(() {
+                    notificationsEnabled = value;
+                  });
+                  SharedPreferences prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('notificationsEnabled', value);
+                },
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _saveSettings,
+                child: Text('Save Settings'),
+              ),
+              if (notificationsEnabled) ...[
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    _testNotification();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Test notification will appear in 5 seconds')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                  child: Text('Test the Notification'),
+                ),
+              ],
+            ],
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildLoginSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Login', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextField(
-          controller: _usernameController,
-          decoration: InputDecoration(labelText: 'Username'),
-        ),
-        TextField(
-          controller: _passwordController,
-          decoration: InputDecoration(labelText: 'Password'),
-          obscureText: true,
-        ),
-        SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: () {
-            username = _usernameController.text;
-            password = _passwordController.text;
-            _login();
-          },
-          child: Text('Login'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Logged in as: $username', style: TextStyle(fontSize: 16)),
-        SizedBox(height: 20),
-        Divider(),
-        SizedBox(height: 10),
-        Text('Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        SwitchListTile(
-          title: Text('Enable Notifications'),
-          value: notificationsEnabled,
-          onChanged: (bool value) {
-            setState(() {
-              notificationsEnabled = value;
-            });
-          },
-        ),
-        SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: _saveSettings,
-          child: Text('Save Settings'),
-        ),
-      ],
     );
   }
 }
