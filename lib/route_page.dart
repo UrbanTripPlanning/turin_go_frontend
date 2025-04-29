@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import 'api/road.dart';
-import 'search_page.dart'; // added to navigate to search page
+import 'search_page.dart';
 import 'dart:convert';
 
 enum TimeSelectionMode {
@@ -58,7 +58,6 @@ class RoutePageState extends State<RoutePage> {
   late DateTime selectedDateTime;
   late TimeSelectionMode timeMode;
 
-  // Local variables for start point
   late String startNameLocal;
   late List<double> startCoordLocal;
 
@@ -194,7 +193,7 @@ class RoutePageState extends State<RoutePage> {
     if (userId == null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       List<Map<String, dynamic>> savedPlans = prefs.getStringList('savedPlans')?.map((e) => Map<String, dynamic>.from(json.decode(e))).toList() ?? [];
-      
+
       savedPlans.add({
         'plan_id': 'local_',
         'src_loc': startCoordLocal,
@@ -290,122 +289,10 @@ class RoutePageState extends State<RoutePage> {
       ),
       body: Column(
         children: [
+          // (inputs like From, To, Date/Time Selection)
           Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Text("From: ", style: TextStyle(fontWeight: FontWeight.bold)),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () async {
-                          final selectedPlace = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SearchPage(isSelectingStartPoint: true),
-                            ),
-                          );
-                          if (selectedPlace != null) {
-                            setState(() {
-                              startNameLocal = selectedPlace['name_en'];
-                              startCoordLocal = [selectedPlace['Longitude'], selectedPlace['Latitude']];
-                            });
-                            _searchRoute();
-                          }
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            startNameLocal,
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text("To: ", style: TextStyle(fontWeight: FontWeight.bold)),
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: widget.endName,
-                          border: OutlineInputBorder(),
-                        ),
-                        enabled: false,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: DropdownButton<TimeSelectionMode>(
-                        value: timeMode,
-                        isExpanded: true,
-                        items: [
-                          DropdownMenuItem(
-                            value: TimeSelectionMode.leaveNow,
-                            child: Text("Leave Now"),
-                          ),
-                          DropdownMenuItem(
-                            value: TimeSelectionMode.departAt,
-                            child: Text("Depart at"),
-                          ),
-                          DropdownMenuItem(
-                            value: TimeSelectionMode.arriveBy,
-                            child: Text("Arrive by"),
-                          ),
-                        ],
-                        onChanged: (TimeSelectionMode? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              timeMode = newValue;
-                            });
-                            _searchRoute();
-                          }
-                        },
-                      ),
-                    ),
-                    if (timeMode != TimeSelectionMode.leaveNow) ...[
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            TextButton.icon(
-                              onPressed: _showDatePicker,
-                              icon: Icon(Icons.calendar_today),
-                              label: Text("${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}"),
-                            ),
-                            TextButton.icon(
-                              onPressed: _showTimePicker,
-                              icon: Icon(Icons.access_time),
-                              label: Text("${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}"),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    Spacer(),
-                    if (timeMode != TimeSelectionMode.leaveNow && !isSaved)
-                      ElevatedButton(
-                        onPressed: isSaving ? null : _saveRoutePlan,
-                        child: Text("Save"),
-                      ),
-                    SizedBox(width: 20),
-                  ],
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.all(16.0),
+            child: buildInputs(),
           ),
           if (isLoading)
             Center(child: CircularProgressIndicator())
@@ -441,13 +328,13 @@ class RoutePageState extends State<RoutePage> {
                           width: 80.0,
                           height: 80.0,
                           point: currentRoutePoints.first,
-                          builder: (ctx) => Icon(Icons.location_on, color: Colors.green, size: 40),
+                          child: Icon(Icons.location_on, color: Colors.green, size: 40),
                         ),
                         Marker(
                           width: 80.0,
                           height: 80.0,
                           point: currentRoutePoints.last,
-                          builder: (ctx) => Icon(Icons.location_on, color: Colors.red, size: 40),
+                          child: Icon(Icons.location_on, color: Colors.red, size: 40),
                         ),
                       ],
                     ),
@@ -455,7 +342,7 @@ class RoutePageState extends State<RoutePage> {
               ),
             ),
           Padding(
-            padding: EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16.0),
             child: Text(
               currentRouteInfo ?? "Loading route info...",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -463,6 +350,124 @@ class RoutePageState extends State<RoutePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget buildInputs() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Text("From: ", style: TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: GestureDetector(
+                onTap: () async {
+                  final selectedPlace = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SearchPage(isSelectingStartPoint: true),
+                    ),
+                  );
+                  if (selectedPlace != null) {
+                    setState(() {
+                      startNameLocal = selectedPlace['name_en'];
+                      startCoordLocal = [selectedPlace['Longitude'], selectedPlace['Latitude']];
+                    });
+                    _searchRoute();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(startNameLocal, style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Text("To: ", style: TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: widget.endName,
+                  border: OutlineInputBorder(),
+                ),
+                enabled: false,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        buildTimeSelector(),
+      ],
+    );
+  }
+
+  Widget buildTimeSelector() {
+    return Row(
+      children: [
+        SizedBox(
+          width: 120,
+          child: DropdownButton<TimeSelectionMode>(
+            value: timeMode,
+            isExpanded: true,
+            items: [
+              DropdownMenuItem(
+                value: TimeSelectionMode.leaveNow,
+                child: Text("Leave Now"),
+              ),
+              DropdownMenuItem(
+                value: TimeSelectionMode.departAt,
+                child: Text("Depart at"),
+              ),
+              DropdownMenuItem(
+                value: TimeSelectionMode.arriveBy,
+                child: Text("Arrive by"),
+              ),
+            ],
+            onChanged: (TimeSelectionMode? newValue) {
+              if (newValue != null) {
+                setState(() {
+                  timeMode = newValue;
+                });
+                _searchRoute();
+              }
+            },
+          ),
+        ),
+        if (timeMode != TimeSelectionMode.leaveNow) ...[
+          const SizedBox(width: 10),
+          Expanded(
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _showDatePicker,
+                  icon: Icon(Icons.calendar_today),
+                  label: Text("${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}"),
+                ),
+                TextButton.icon(
+                  onPressed: _showTimePicker,
+                  icon: Icon(Icons.access_time),
+                  label: Text("${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}"),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const Spacer(),
+        if (timeMode != TimeSelectionMode.leaveNow && !isSaved)
+          ElevatedButton(
+            onPressed: isSaving ? null : _saveRoutePlan,
+            child: Text("Save"),
+          ),
+        const SizedBox(width: 20),
+      ],
     );
   }
 }

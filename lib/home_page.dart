@@ -22,7 +22,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late Future<Map<String, dynamic>> roadData;
   late Future<List<TrafficPoint>> trafficData;
   LatLng? _currentPosition;
   static const String _locationKey = 'user_location';
@@ -44,31 +43,21 @@ class _HomePageState extends State<HomePage> {
     _trafficPolylines = points.map((point) => Polyline(
       points: [point.start, point.end],
       strokeWidth: 3.0,
-      color: getColorWithFlowRate(point.flow).withAlpha((0.7 * 255).round()),
+      color: getColorWithFlowRate(point.flow).withOpacity(0.7),
       isDotted: false,
     )).toList();
   }
 
   Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled. Please enable them in your device settings.');
-    }
-
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
+      if (permission == LocationPermission.denied) return;
     }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error('Location permissions are permanently denied, we cannot request permissions.');
-    } 
+    if (permission == LocationPermission.deniedForever) return;
 
     Position position = await Geolocator.getCurrentPosition();
     final location = LatLng(position.latitude, position.longitude);
@@ -87,8 +76,6 @@ class _HomePageState extends State<HomePage> {
 
   bool showTraffic = false;
   final LatLng _initialPosition = LatLng(45.06288, 7.66277);
-
-  final String normalTileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   Future<List<TrafficPoint>> fetchTrafficData() async {
     List<TrafficPoint> result = [];
@@ -115,21 +102,18 @@ class _HomePageState extends State<HomePage> {
               zoom: 15.0,
               maxZoom: 18.0,
               minZoom: 10.0,
-              keepAlive: true,
               onPositionChanged: (position, hasGesture) {
                 if (hasGesture) {
                   setState(() => _isMapMoving = true);
                   Future.delayed(Duration(milliseconds: 150), () {
-                    if (mounted) {
-                      setState(() => _isMapMoving = false);
-                    }
+                    if (mounted) setState(() => _isMapMoving = false);
                   });
                 }
               },
             ),
             children: [
               TileLayer(
-                urlTemplate: normalTileUrl,
+                urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 subdomains: ['a', 'b', 'c'],
                 userAgentPackageName: 'com.example.turinGoFrontend',
               ),
@@ -145,7 +129,7 @@ class _HomePageState extends State<HomePage> {
                       width: 80.0,
                       height: 80.0,
                       point: _currentPosition!,
-                      builder: (ctx) => Icon(Icons.location_on, color: Colors.blue, size: 40),
+                      child: Icon(Icons.location_on, color: Colors.blue, size: 40),
                     ),
                   ],
                 ),
@@ -157,7 +141,7 @@ class _HomePageState extends State<HomePage> {
                 'OpenStreetMap contributors',
                 onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
               )
-            ]
+            ],
           ),
           Positioned(
             top: 50,
@@ -200,12 +184,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Color getColorWithFlowRate(double flow) {
-    if (flow > 0.75) {
-      return Colors.green;
-    } else if (flow > 0.4) {
-      return Colors.yellow;
-    } else {
-      return Colors.red;
-    }
+    if (flow > 0.75) return Colors.green;
+    if (flow > 0.4) return Colors.yellow;
+    return Colors.red;
   }
 }
+
