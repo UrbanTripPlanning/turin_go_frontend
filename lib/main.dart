@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:timezone/data/latest.dart' as tz; // ✅ For time zone setup
+import 'notification_service.dart'; // ✅ Make sure this file exists
 import 'home_page.dart';
 import 'saved_page.dart';
 import 'settings_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Initialize time zone for scheduled notifications
+  tz.initializeTimeZones();
+
+  // ✅ Initialize local notifications (Android + iOS)
+  await NotificationService.initialize();
+
   runApp(MyApp());
 }
 
@@ -14,7 +24,7 @@ class MyApp extends StatelessWidget {
       title: 'Turin Go',
       theme: ThemeData(
         useMaterial3: false,
-        primarySwatch: Colors.blue
+        primarySwatch: Colors.blue,
       ),
       home: MainPage(),
     );
@@ -66,3 +76,4 @@ class MainPageState extends State<MainPage> {
     );
   }
 }
+
