@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
 import 'route_page.dart';
+import 'notification_service.dart';
+import 'dart:async';
 import 'dart:convert';
 
 class SavedPage extends StatefulWidget {
@@ -14,6 +16,9 @@ class SavedPageState extends State<SavedPage> {
   List<Map<String, dynamic>> planList = [];
   bool isLoading = false;
   String? errorMessage;
+  Timer? dailyTimer;
+  List<Timer> tripTimers = [];
+  bool notificationsEnabled = false;
 
   @override
   void initState() {
@@ -21,11 +26,21 @@ class SavedPageState extends State<SavedPage> {
     _loadUserData();
   }
 
+  @override
+  void dispose() {
+    dailyTimer?.cancel();
+    for (var timer in tripTimers) {
+      timer.cancel();
+    }
+    super.dispose();
+  }
+
   Future<void> _loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
       userId = prefs.getString('userId');
+      notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
     });
     _getPlanList();
   }
@@ -37,6 +52,7 @@ class SavedPageState extends State<SavedPage> {
       isLoading = true;
       errorMessage = null;
     });
+
 
     if (userId == null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -55,6 +71,7 @@ class SavedPageState extends State<SavedPage> {
       return;
     }
 
+
     try {
       final result = await RoadApi.listRoute(userId: userId ?? '');
       if (!mounted) return;
@@ -62,12 +79,85 @@ class SavedPageState extends State<SavedPage> {
         planList = List<Map<String, dynamic>>.from(result['data']);
         isLoading = false;
       });
+
+      if (notificationsEnabled) {
+        _scheduleDailyCheck();
+        _scheduleTripChecks();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         errorMessage = 'Failed to load route: ${e.toString()}';
         isLoading = false;
       });
+    }
+  }
+
+  void _scheduleDailyCheck() {
+    dailyTimer?.cancel();
+
+    final now = DateTime.now();
+    final next9PM = DateTime(now.year, now.month, now.day, 21, 0);
+    final diff = next9PM.isAfter(now) ? next9PM.difference(now) : next9PM.add(Duration(days: 1)).difference(now);
+
+    dailyTimer = Timer(diff, () async {
+      await _checkTripsForUpdate();
+      _scheduleDailyCheck(); // reschedule next day
+    });
+  }
+
+  void _scheduleTripChecks() {
+    tripTimers.forEach((timer) => timer.cancel());
+    tripTimers.clear();
+
+    for (var trip in planList) {
+      final durationMinutes = trip['spend_time'] ?? 0;
+      final leaveTimestamp = (trip['time_mode'] == 1)
+          ? trip['start_at'] * 1000
+          : (trip['end_at'] - durationMinutes * 60) * 1000;
+
+      final leaveTime = DateTime.fromMillisecondsSinceEpoch(leaveTimestamp);
+      final checkTime = leaveTime.subtract(Duration(minutes: durationMinutes * 2));
+
+      final now = DateTime.now();
+      if (checkTime.isAfter(now)) {
+        final timer = Timer(checkTime.difference(now), () async {
+          await _checkTripsForUpdate();
+        });
+        tripTimers.add(timer);
+      }
+    }
+  }
+
+  Future<void> _checkTripsForUpdate() async {
+    if (userId == null) return;
+    if (!notificationsEnabled) return;
+
+    try {
+      final result = await RoadApi.listRoute(userId: userId ?? '');
+      final latestTrips = List<Map<String, dynamic>>.from(result['data']);
+
+      for (var oldTrip in planList) {
+        final newTrip = latestTrips.firstWhere(
+              (element) => element['plan_id'] == oldTrip['plan_id'],
+          orElse: () => {},
+        );
+
+        if (newTrip.isNotEmpty) {
+          final oldDuration = oldTrip['spend_time'];
+          final newDuration = newTrip['spend_time'];
+
+          if (oldDuration != newDuration) {
+            await NotificationService.showNotification(
+              id: oldTrip['plan_id'].hashCode,
+              title: 'Trip Update',
+              body: 'Trip to ${oldTrip['dst_name']} updated: $oldDuration min ➔ $newDuration min',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking trips: $e');
     }
   }
 
@@ -129,234 +219,11 @@ class SavedPageState extends State<SavedPage> {
                   ),
                 );
               },
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(icon: Icon(Icons.edit), onPressed: () {}),
-                  IconButton(icon: Icon(Icons.delete), onPressed: () {}),
-                ],
-              ),
             ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddTripPage()),
-          ).then((newTrip) {
-            if (newTrip == true) {
-              _getPlanList(); // reload saved trips
-            }
-          });
-        },
-        child: Icon(Icons.add),
-      ),
     );
   }
 }
 
-class AddTripPage extends StatefulWidget {
-  @override
-  AddTripPageState createState() => AddTripPageState();
-}
-
-class AddTripPageState extends State<AddTripPage> {
-  final _formKey = GlobalKey<FormState>();
-  String? tripName;
-  String from = '';
-  String to = '';
-  TimeOfDay? leaveTime;
-  bool isLeaveTime = true;
-  List<String> selectedDays = [];
-  DateTime? specificDate;
-  bool isUsingSpecificDate = false;
-  String transport = 'Walking';
-  bool isLoading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Add Trip')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: isLoading
-            ? Center(child: CircularProgressIndicator())
-            : Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                decoration: InputDecoration(labelText: "Name", hintText: "Enter trip's name (optional)"),
-                onChanged: (value) => setState(() => tripName = value),
-              ),
-              SizedBox(height: 10),
-              TextFormField(
-                decoration: InputDecoration(labelText: 'From'),
-                onChanged: (value) => setState(() => from = value),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter a starting point' : null,
-              ),
-              TextFormField(
-                decoration: InputDecoration(labelText: 'To'),
-                onChanged: (value) => setState(() => to = value),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter a destination' : null,
-              ),
-              SizedBox(height: 20),
-              Text("Time Preferences", style: TextStyle(fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<bool>(
-                      title: Text('Leave At'),
-                      value: true,
-                      groupValue: isLeaveTime,
-                      onChanged: (val) => setState(() => isLeaveTime = val!),
-                    ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<bool>(
-                      title: Text('Arrived by'),
-                      value: false,
-                      groupValue: isLeaveTime,
-                      onChanged: (val) => setState(() => isLeaveTime = val!),
-                    ),
-                  ),
-                ],
-              ),
-              ListTile(
-                title: Text(leaveTime == null ? 'Choose time' : 'Time: ${leaveTime!.format(context)}'),
-                trailing: Icon(Icons.access_time),
-                onTap: () async {
-                  TimeOfDay? picked = await showTimePicker(
-                    context: context,
-                    initialTime: leaveTime ?? TimeOfDay.now(),
-                  );
-                  if (picked != null) setState(() => leaveTime = picked);
-                },
-              ),
-              SizedBox(height: 20),
-              Text("Repeat or Specific Date", style: TextStyle(fontWeight: FontWeight.bold)),
-              RadioListTile<bool>(
-                title: Text("Use weekday preferences"),
-                value: false,
-                groupValue: isUsingSpecificDate,
-                onChanged: (val) => setState(() => isUsingSpecificDate = val!),
-              ),
-              if (!isUsingSpecificDate)
-                Wrap(
-                  spacing: 10,
-                  children: ['Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'].map((day) {
-                    final isSelected = selectedDays.contains(day);
-                    return FilterChip(
-                      label: Text(day),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            selectedDays.add(day);
-                          } else {
-                            selectedDays.remove(day);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              RadioListTile<bool>(
-                title: Text("Use specific date"),
-                value: true,
-                groupValue: isUsingSpecificDate,
-                onChanged: (val) => setState(() => isUsingSpecificDate = val!),
-              ),
-              if (isUsingSpecificDate)
-                ListTile(
-                  title: Text(specificDate == null ? 'Choose date' : specificDate!.toIso8601String().split('T')[0]),
-                  trailing: Icon(Icons.calendar_today),
-                  onTap: () async {
-                    DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
-                    );
-                    if (picked != null) setState(() => specificDate = picked);
-                  },
-                ),
-              SizedBox(height: 20),
-              Text("Means of Transport", style: TextStyle(fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: Text("Walking"),
-                      value: 'Walking',
-                      groupValue: transport,
-                      onChanged: (val) => setState(() => transport = val!),
-                    ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: Text("Drive"),
-                      value: 'Drive',
-                      groupValue: transport,
-                      onChanged: (val) => setState(() => transport = val!),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    setState(() => isLoading = true);
-
-                    try {
-                      final now = DateTime.now();
-                      final leaveDateTime = leaveTime != null
-                          ? DateTime(now.year, now.month, now.day, leaveTime!.hour, leaveTime!.minute)
-                          : now;
-
-                      final startAt = isLeaveTime ? leaveDateTime.millisecondsSinceEpoch ~/ 1000 : null;
-                      final endAt = !isLeaveTime ? leaveDateTime.millisecondsSinceEpoch ~/ 1000 : null;
-
-                      final result = await RoadApi.saveRoute(
-                        userId: '',
-                        start: [45.0, 7.0], // Replace with real coordinates if available
-                        end: [45.1, 7.1],
-                        spendTime: 15,
-                        timeMode: isLeaveTime ? 1 : 0,
-                        startName: from,
-                        endName: to,
-                        routeMode: transport.toLowerCase() == 'walking' ? 0 : 1,
-                        startAt: startAt,
-                        endAt: endAt,
-                      );
-
-                      if (!context.mounted) return;
-                      if (result['data'] == null) {
-                        Navigator.pop(context, true); // trip saved
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save trip')));
-                      }
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    } finally {
-                      setState(() => isLoading = false);
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[200],
-                  foregroundColor: Colors.black,
-                ),
-                child: Text("Save Trip"),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
