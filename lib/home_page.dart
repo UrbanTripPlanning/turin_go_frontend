@@ -44,7 +44,7 @@ class _HomePageState extends State<HomePage> {
     _trafficPolylines = points.map((point) => Polyline(
       points: [point.start, point.end],
       strokeWidth: 3.0,
-      color: getColorWithFlowRate(point.flow).withOpacity(0.7),
+      color: getColorWithFlowRate(point.flow).withAlpha((0.7 * 255).round()),
       isDotted: false,
     )).toList();
   }

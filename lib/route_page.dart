@@ -122,8 +122,8 @@ class RoutePageState extends State<RoutePage> {
         walkingMinutes = walkingData['times'];
         drivingMinutes = drivingData['times'];
 
-        walkingRouteInfo = "${walkingMinutes} min (${_formatDistance(walkingData['distances'])})";
-        drivingRouteInfo = "${drivingMinutes} min (${_formatDistance(drivingData['distances'])})";
+        walkingRouteInfo = "$walkingMinutes min (${_formatDistance(walkingData['distances'])})";
+        drivingRouteInfo = "$drivingMinutes min (${_formatDistance(drivingData['distances'])})";
 
         isSaved = false;
         isLoading = false;
@@ -138,7 +138,7 @@ class RoutePageState extends State<RoutePage> {
 
   String _formatDistance(dynamic distanceMeters) {
     if (distanceMeters < 1000) {
-      return "${distanceMeters} m";
+      return "$distanceMeters m";
     } else {
       return "${(distanceMeters / 1000).toStringAsFixed(1)} km";
     }

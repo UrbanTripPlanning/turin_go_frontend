@@ -315,12 +315,14 @@ class AddTripPageState extends State<AddTripPage> {
                         endAt: endAt,
                       );
 
+                      if (!context.mounted) return;
                       if (result['data'] == null) {
                         Navigator.pop(context, true); // trip saved
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save trip')));
                       }
                     } catch (e) {
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                     } finally {
                       setState(() => isLoading = false);

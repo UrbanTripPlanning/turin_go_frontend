@@ -43,8 +43,8 @@ class SettingsPageState extends State<SettingsPage> {
   Future<void> _login() async {
     try {
       final result = await CommonApi.login(username: username, password: password);
+      if (!mounted) return;
       if (result['data'] != null) {
-        if (!mounted) return;
 
         setState(() {
           userId = result['data']['user_id'];
@@ -54,7 +54,7 @@ class SettingsPageState extends State<SettingsPage> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', userId!);
         await prefs.setString('username', username);
-
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Successfully logged in as $username')),
         );
