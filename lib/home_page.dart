@@ -157,14 +157,21 @@ class _HomePageState extends State<HomePage> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withAlpha(230),
+                  color: Colors.white.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    )
+                  ],
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.search, color: Colors.white),
+                    Icon(Icons.search, color: Colors.black54),
                     SizedBox(width: 10),
-                    Text("Search here", style: TextStyle(color: Colors.white)),
+                    Text("Search here", style: TextStyle(color: Colors.black87)),
                   ],
                 ),
               ),

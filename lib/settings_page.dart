@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notification_service.dart';
+import 'glass_container.dart';
 import 'api/common.dart';
-import 'notification_service.dart'; // Make sure you have this!
 
 class SettingsPage extends StatefulWidget {
   @override
@@ -11,16 +12,22 @@ class SettingsPage extends StatefulWidget {
 class SettingsPageState extends State<SettingsPage> {
   String username = '';
   String password = '';
+  String confirmPassword = '';
+  bool passwordVisible = false;
   bool notificationsEnabled = false;
   String? userId;
+  bool isRegistering = false;
+
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
+  late TextEditingController _confirmPasswordController;
 
   @override
   void initState() {
     super.initState();
     _usernameController = TextEditingController();
     _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
     _loadUserData();
   }
 
@@ -28,6 +35,7 @@ class SettingsPageState extends State<SettingsPage> {
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -41,49 +49,74 @@ class SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  Future<void> _login() async {
+  Future<void> _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userId');
+    await prefs.remove('username');
+    if (!mounted) return;
+    setState(() {
+      userId = null;
+      username = '';
+      _usernameController.clear();
+      _passwordController.clear();
+      _confirmPasswordController.clear();
+    });
+  }
+
+  Future<void> _loginOrRegister() async {
+    if (isRegistering && password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Passwords do not match")),
+      );
+      return;
+    }
+
     try {
       final result = await CommonApi.login(username: username, password: password);
       if (result['data'] != null) {
         if (!mounted) return;
-
         setState(() {
           userId = result['data']['user_id'];
           username = result['data']['username'];
         });
-
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', userId!);
         await prefs.setString('username', username);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully logged in as $username')),
+          SnackBar(
+            content: Text(
+              isRegistering
+                  ? 'Registered and logged in as $username'
+                  : 'Successfully logged in as $username',
+            ),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: ${result['message']}')),
+          SnackBar(
+            content: Text(
+              '${isRegistering ? "Registration" : "Login"} failed: ${result['message']}',
+            ),
+          ),
         );
       }
     } catch (e) {
-      print('Error during login: $e');
+      print('Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error during login')),
+        SnackBar(content: Text('Error during ${isRegistering ? "registration" : "login"}')),
       );
     }
   }
 
   Future<void> _saveSettings() async {
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('notificationsEnabled', notificationsEnabled);
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', notificationsEnabled);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Settings saved successfully')),
-      );
-    } catch (e) {
-      print('Error saving settings: $e');
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Settings saved successfully')),
+    );
   }
 
   Future<void> _testNotification() async {
@@ -95,74 +128,146 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: Colors.grey.shade800),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.9),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Settings'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Login', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            if (userId != null)
-              Text('Logged in as: $username', style: TextStyle(fontSize: 16))
-            else ...[
-              TextField(
-                controller: _usernameController,
-                decoration: InputDecoration(labelText: 'Username'),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFF5F5F5), Color(0xFFFFFFFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: GlassContainer(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Text(
+                    userId == null
+                        ? (isRegistering ? 'Register' : 'Login')
+                        : 'Settings',
+                    style: const TextStyle(fontSize: 26, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 20),
+                  if (userId == null) ...[
+                    TextField(
+                      controller: _usernameController,
+                      decoration: _inputDecoration('Username'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: !passwordVisible,
+                      decoration: _inputDecoration('Password').copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () => setState(() {
+                            passwordVisible = !passwordVisible;
+                          }),
+                        ),
+                      ),
+                    ),
+                    if (isRegistering) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _confirmPasswordController,
+                        obscureText: !passwordVisible,
+                        decoration: _inputDecoration('Confirm Password').copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() {
+                              passwordVisible = !passwordVisible;
+                            }),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        username = _usernameController.text.trim();
+                        password = _passwordController.text.trim();
+                        confirmPassword = _confirmPasswordController.text.trim();
+                        _loginOrRegister();
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                      child: Text(isRegistering ? 'Register' : 'Login'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          isRegistering = !isRegistering;
+                        });
+                      },
+                      child: Text(
+                        isRegistering
+                            ? 'Already have an account? Login'
+                            : 'Don\'t have an account? Register',
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ),
+                  ] else ...[
+                    Text('Logged in as: $username', style: const TextStyle(color: Colors.black87)),
+                    const SizedBox(height: 20),
+                    SwitchListTile(
+                      title: const Text('Enable Notifications', style: TextStyle(color: Colors.black87)),
+                      value: notificationsEnabled,
+                      onChanged: (bool value) async {
+                        setState(() {
+                          notificationsEnabled = value;
+                        });
+                        SharedPreferences prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('notificationsEnabled', value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _saveSettings,
+                      child: const Text('Save Settings'),
+                    ),
+                    const SizedBox(height: 10),
+                    if (notificationsEnabled)
+                      ElevatedButton(
+                        onPressed: () {
+                          _testNotification();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Test notification will appear in 5 seconds')),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                        child: const Text('Test the Notification'),
+                      ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _logout,
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ],
               ),
-              TextField(
-                controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  username = _usernameController.text;
-                  password = _passwordController.text;
-                  _login();
-                },
-                child: Text('Login'),
-              ),
-            ],
-            if (userId != null) ...[
-              SizedBox(height: 20),
-              Text('Notifications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              SwitchListTile(
-                title: Text('Enable Notifications'),
-                value: notificationsEnabled,
-                onChanged: (bool value) async {
-                  setState(() {
-                    notificationsEnabled = value;
-                  });
-                  SharedPreferences prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('notificationsEnabled', value);
-                },
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _saveSettings,
-                child: Text('Save Settings'),
-              ),
-              if (notificationsEnabled) ...[
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    _testNotification();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Test notification will appear in 5 seconds')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                  child: Text('Test the Notification'),
-                ),
-              ],
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );

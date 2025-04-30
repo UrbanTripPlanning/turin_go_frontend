@@ -1,10 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
 import 'route_page.dart';
 import 'notification_service.dart';
-import 'dart:async';
-import 'dart:convert';
 
 class SavedPage extends StatefulWidget {
   @override
@@ -53,7 +55,6 @@ class SavedPageState extends State<SavedPage> {
       errorMessage = null;
     });
 
-
     if (userId == null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       List<String>? savedPlans = prefs.getStringList('savedPlans');
@@ -70,7 +71,6 @@ class SavedPageState extends State<SavedPage> {
       });
       return;
     }
-
 
     try {
       final result = await RoadApi.listRoute(userId: userId ?? '');
@@ -95,14 +95,13 @@ class SavedPageState extends State<SavedPage> {
 
   void _scheduleDailyCheck() {
     dailyTimer?.cancel();
-
     final now = DateTime.now();
     final next9PM = DateTime(now.year, now.month, now.day, 21, 0);
     final diff = next9PM.isAfter(now) ? next9PM.difference(now) : next9PM.add(Duration(days: 1)).difference(now);
 
     dailyTimer = Timer(diff, () async {
       await _checkTripsForUpdate();
-      _scheduleDailyCheck(); // reschedule next day
+      _scheduleDailyCheck();
     });
   }
 
@@ -130,8 +129,7 @@ class SavedPageState extends State<SavedPage> {
   }
 
   Future<void> _checkTripsForUpdate() async {
-    if (userId == null) return;
-    if (!notificationsEnabled) return;
+    if (userId == null || !notificationsEnabled) return;
 
     try {
       final result = await RoadApi.listRoute(userId: userId ?? '');
@@ -151,7 +149,7 @@ class SavedPageState extends State<SavedPage> {
             await NotificationService.showNotification(
               id: oldTrip['plan_id'].hashCode,
               title: 'Trip Update',
-              body: 'Trip to ${oldTrip['dst_name']} updated: $oldDuration min ➔ $newDuration min',
+              body: 'Trip to ${oldTrip['dst_name']} updated: ${oldDuration} min ➔ ${newDuration} min',
             );
           }
         }
@@ -168,62 +166,100 @@ class SavedPageState extends State<SavedPage> {
     } else {
       dt = DateTime.fromMillisecondsSinceEpoch((trip['end_at'] - trip['spend_time'] * 60) * 1000).toLocal().toString();
     }
-
     return [dt.split(' ')[0], dt.split(' ')[1].substring(0, 5)];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Saved Trips')),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : errorMessage != null
-          ? Center(child: Text(errorMessage!, style: TextStyle(color: Colors.red)))
-          : ListView.builder(
-        padding: EdgeInsets.all(10),
-        itemCount: planList.length,
-        itemBuilder: (context, index) {
-          final trip = planList[index];
-          final leaveTime = _getLeaveTime(trip);
-          return Card(
-            margin: EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              title: Text('To: ${trip['dst_name']}', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Padding(
-                padding: EdgeInsets.symmetric(vertical: 5),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Leave by ${leaveTime[0]} ${leaveTime[1]}'),
-                    Text('From ${trip['src_name']} To ${trip['dst_name']}'),
-                    Text('Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == 0 ? 'walking' : 'driving'}'),
-                  ],
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.only(top: 60, bottom: 20),
+            width: double.infinity,
+            color: const Color(0xFFB3E5FC),
+            child: const Center(
+              child: Text(
+                'Saved Trips',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  color: Colors.black87,
                 ),
               ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => RoutePage(
-                      startName: trip['src_name'],
-                      endName: trip['dst_name'],
-                      startCoord: (trip['src_loc'] as List).map((e) => (e as num).toDouble()).toList(),
-                      endCoord: (trip['dst_loc'] as List).map((e) => (e as num).toDouble()).toList(),
-                      planId: trip['plan_id'],
-                      routeMode: trip['route_mode'],
-                      timeMode: trip['time_mode'],
-                      startAt: trip['start_at'],
-                      endAt: trip['end_at'],
+            ),
+          ),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : errorMessage != null
+                ? Center(child: Text(errorMessage!, style: const TextStyle(color: Colors.red)))
+                : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              itemCount: planList.length,
+              itemBuilder: (context, index) {
+                final trip = planList[index];
+                final leaveTime = _getLeaveTime(trip);
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      title: Text(
+                        'To: ${trip['dst_name']}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text('Leave by ${leaveTime[0]} ${leaveTime[1]}', style: const TextStyle(color: Colors.black54)),
+                          Text('From ${trip['src_name']} To ${trip['dst_name']}', style: const TextStyle(color: Colors.black54)),
+                          Text('Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == 0 ? 'walking' : 'driving'}', style: const TextStyle(color: Colors.black54)),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RoutePage(
+                              startName: trip['src_name'],
+                              endName: trip['dst_name'],
+                              startCoord: (trip['src_loc'] as List).map((e) => (e as num).toDouble()).toList(),
+                              endCoord: (trip['dst_loc'] as List).map((e) => (e as num).toDouble()).toList(),
+                              planId: trip['plan_id'],
+                              routeMode: trip['route_mode'],
+                              timeMode: trip['time_mode'],
+                              startAt: trip['start_at'],
+                              endAt: trip['end_at'],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 );
               },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 }
-
