@@ -15,8 +15,8 @@ dependencies:
   english_words: ^4.0.0
   provider: ^6.0.0
   google_maps_flutter: ^2.5.0
-  flutter_map: ^6.0.0           # ✅ upgraded
-  latlong2: ^0.9.1              # ✅ compatible with newer flutter_map
+  flutter_map: ^6.0.0
+  latlong2: ^0.9.1
   url_launcher: ^6.2.5
   geolocator: ^9.0.2
   shared_preferences: ^2.5.3
@@ -27,7 +27,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
 
