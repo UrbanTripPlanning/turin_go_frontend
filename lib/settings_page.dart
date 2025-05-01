@@ -17,6 +17,7 @@ class SettingsPageState extends State<SettingsPage> {
   bool notificationsEnabled = false;
   String? userId;
   bool isRegistering = false;
+  final String appVersion = 'v0.0.1';
 
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
@@ -134,6 +135,7 @@ class SettingsPageState extends State<SettingsPage> {
       labelStyle: TextStyle(color: Colors.grey.shade800),
       filled: true,
       fillColor: Colors.white.withOpacity(0.9),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -148,56 +150,53 @@ class SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFF5F5F5), Color(0xFFFFFFFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFADD8E6),
+        elevation: 0,
+        centerTitle: true,
+        title: const Text('Settings', style: TextStyle(color: Colors.black)),
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: SafeArea(
+        child: userId == null
+            ? Center(
           child: GlassContainer(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Text(
-                    userId == null
-                        ? (isRegistering ? 'Register' : 'Login')
-                        : 'Settings',
-                    style: const TextStyle(fontSize: 26, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 20),
-                  if (userId == null) ...[
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      isRegistering ? 'Register' : 'Login',
+                      style: const TextStyle(fontSize: 26, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 20),
                     TextField(
                       controller: _usernameController,
                       decoration: _inputDecoration('Username'),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _passwordController,
                       obscureText: !passwordVisible,
                       decoration: _inputDecoration('Password').copyWith(
                         suffixIcon: IconButton(
                           icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() {
-                            passwordVisible = !passwordVisible;
-                          }),
+                          onPressed: () => setState(() => passwordVisible = !passwordVisible),
                         ),
                       ),
                     ),
                     if (isRegistering) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       TextField(
                         controller: _confirmPasswordController,
                         obscureText: !passwordVisible,
                         decoration: _inputDecoration('Confirm Password').copyWith(
                           suffixIcon: IconButton(
                             icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() {
-                              passwordVisible = !passwordVisible;
-                            }),
+                            onPressed: () => setState(() => passwordVisible = !passwordVisible),
                           ),
                         ),
                       ),
@@ -210,32 +209,42 @@ class SettingsPageState extends State<SettingsPage> {
                         confirmPassword = _confirmPasswordController.text.trim();
                         _loginOrRegister();
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                       child: Text(isRegistering ? 'Register' : 'Login'),
                     ),
                     TextButton(
-                      onPressed: () {
-                        setState(() {
-                          isRegistering = !isRegistering;
-                        });
-                      },
+                      onPressed: () => setState(() => isRegistering = !isRegistering),
                       child: Text(
-                        isRegistering
-                            ? 'Already have an account? Login'
-                            : 'Don\'t have an account? Register',
+                        isRegistering ? 'Already have an account? Login' : 'Don\'t have an account? Register',
                         style: const TextStyle(color: Colors.black54),
                       ),
                     ),
-                  ] else ...[
+                    const SizedBox(height: 30),
+                    Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        )
+            : Center(
+          child: GlassContainer(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
                     Text('Logged in as: $username', style: const TextStyle(color: Colors.black87)),
                     const SizedBox(height: 20),
                     SwitchListTile(
                       title: const Text('Enable Notifications', style: TextStyle(color: Colors.black87)),
                       value: notificationsEnabled,
                       onChanged: (bool value) async {
-                        setState(() {
-                          notificationsEnabled = value;
-                        });
+                        setState(() => notificationsEnabled = value);
                         SharedPreferences prefs = await SharedPreferences.getInstance();
                         await prefs.setBool('notificationsEnabled', value);
                       },
@@ -243,6 +252,9 @@ class SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 10),
                     ElevatedButton(
                       onPressed: _saveSettings,
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                       child: const Text('Save Settings'),
                     ),
                     const SizedBox(height: 10),
@@ -254,17 +266,25 @@ class SettingsPageState extends State<SettingsPage> {
                             const SnackBar(content: Text('Test notification will appear in 5 seconds')),
                           );
                         },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                         child: const Text('Test the Notification'),
                       ),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       onPressed: _logout,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                       child: const Text('Logout'),
                     ),
+                    const SizedBox(height: 30),
+                    Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -273,4 +293,3 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 }
-
