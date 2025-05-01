@@ -234,6 +234,50 @@ class SavedPageState extends State<SavedPage> {
                           Text('Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == 0 ? 'walking' : 'driving'}', style: const TextStyle(color: Colors.black54)),
                         ],
                       ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Trip'),
+                              content: const Text('Are you sure you want to delete this trip?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('No'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  child: const Text('Yes'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirmed == true) {
+                            try {
+                              if (userId == null) {
+                                SharedPreferences prefs = await SharedPreferences.getInstance();
+                                List<String> savedPlans = prefs.getStringList('savedPlans') ?? [];
+                                savedPlans.removeWhere((plan) {
+                                  final map = json.decode(plan);
+                                  return map['plan_id'] == trip['plan_id'];
+                                });
+                                await prefs.setStringList('savedPlans', savedPlans);
+                                setState(() => planList.removeAt(index));
+                              } else {
+                                await RoadApi.deleteRoute(planId: trip['plan_id']);
+                                setState(() => planList.removeAt(index));
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to delete trip: ${e.toString()}')),
+                              );
+                            }
+                          }
+                        },
+                      ),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -263,3 +307,4 @@ class SavedPageState extends State<SavedPage> {
     );
   }
 }
+

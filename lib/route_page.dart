@@ -139,7 +139,40 @@ class RoutePageState extends State<RoutePage> {
     });
 
     if (userId == null) {
-      // TODO: local saved
+      try {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        List<String> savedPlans = prefs.getStringList('savedPlans') ?? [];
+
+        final newPlan = {
+          'plan_id': DateTime.now().millisecondsSinceEpoch.toString(),
+          'src_name': startNameLocal,
+          'dst_name': widget.endName,
+          'src_loc': startCoordLocal,
+          'dst_loc': widget.endCoord,
+          'spend_time': _isWalking ? walkingMinutes : drivingMinutes,
+          'time_mode': timeMode.index,
+          'start_at': timeMode == TimeSelectionMode.departAt
+              ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
+              : 0,
+          'end_at': timeMode == TimeSelectionMode.arriveBy
+              ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
+              : 0,
+          'route_mode': _isWalking ? 0 : 1,
+        };
+
+        savedPlans.add(json.encode(newPlan));
+        await prefs.setStringList('savedPlans', savedPlans);
+
+        setState(() {
+          isSaved = true;
+          isSaving = false;
+        });
+      } catch (e) {
+        setState(() {
+          errorMessage = 'Failed to save trip locally: ${e.toString()}';
+          isSaving = false;
+        });
+      }
       return;
     }
 
@@ -173,6 +206,7 @@ class RoutePageState extends State<RoutePage> {
       });
     }
   }
+
 
   String _formatDistance(dynamic distanceMeters) {
     if (distanceMeters < 1000) return "$distanceMeters m";
