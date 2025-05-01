@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:timezone/data/latest.dart' as tz; // ✅ For time zone setup
-import 'notification_service.dart'; // ✅ Make sure this file exists
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
+import 'notification_service.dart';
 import 'home_page.dart';
 import 'saved_page.dart';
 import 'settings_page.dart';
@@ -33,15 +35,29 @@ void startPolling() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ Initialize time zone for scheduled notifications
+  // Initialize timezone for scheduled notifications
   tz.initializeTimeZones();
 
-  // ✅ Initialize local notifications (Android + iOS)
+  // Initialize local notifications
   await NotificationService.initialize();
+
+  if (!kIsWeb) {
+    await _requestMobilePermissions();
+  }
 
   startPolling();
 
   runApp(MyApp());
+}
+
+Future<void> _requestMobilePermissions() async {
+  if (await Permission.location.isDenied) {
+    await Permission.location.request();
+  }
+
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -86,21 +102,11 @@ class MainPageState extends State<MainPage> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bookmark),
-            label: 'Saved',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'Saved'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
     );
   }
 }
-
