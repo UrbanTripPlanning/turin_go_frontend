@@ -61,6 +61,22 @@ class RoadApi {
     }
   }
 
+  static Future<Map<String, dynamic>> deleteRoute({
+    required String planId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${Config.baseURL}/route/delete').replace(queryParameters: {
+        'plan_id': planId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to delete route data');
+    }
+  }
+
   static Future<Map<String, dynamic>> listRoute({
     required String userId,
   }) async {
