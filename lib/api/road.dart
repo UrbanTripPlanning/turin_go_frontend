@@ -76,4 +76,20 @@ class RoadApi {
       throw Exception('Failed to list route data');
     }
   }
+
+  static Future<Map<String, dynamic>> afftectedRoute({
+    required String userId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${Config.baseURL}/route/list/affected').replace(queryParameters: {
+        'user_id': userId.toString(),
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to list affected route data');
+    }
+  }
 }

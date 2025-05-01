@@ -1,9 +1,34 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:timezone/data/latest.dart' as tz; // ✅ For time zone setup
 import 'notification_service.dart'; // ✅ Make sure this file exists
 import 'home_page.dart';
 import 'saved_page.dart';
 import 'settings_page.dart';
+import 'api/road.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const fetchAffectedPlansTask = "fetchAffectedPlan";
+Timer? _pollingTimer;
+
+void startPolling() {
+  _pollingTimer?.cancel();
+
+  _pollingTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    if (userId == null) {
+      return;
+    }
+    final result = await RoadApi.afftectedRoute(userId: userId);
+    final planList = result['data'];
+    if (planList == null || planList.isEmpty) {
+      return;
+    }
+    // TODO: notification
+    print('plan changed: $planList');
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +38,8 @@ void main() async {
 
   // ✅ Initialize local notifications (Android + iOS)
   await NotificationService.initialize();
+
+  startPolling();
 
   runApp(MyApp());
 }
