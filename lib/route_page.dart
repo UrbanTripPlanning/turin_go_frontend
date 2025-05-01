@@ -258,10 +258,19 @@ class RoutePageState extends State<RoutePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: isSaving || isSaved ? null : _saveRoutePlan,
-                      icon: const Icon(Icons.save),
-                      label: Text(isSaved ? "Saved" : "Save"),
+                    SizedBox(
+                      width: 130,
+                      child: Visibility(
+                        visible: timeMode != TimeSelectionMode.leaveNow,
+                        maintainSize: true,
+                        maintainAnimation: true,
+                        maintainState: true,
+                        child: ElevatedButton.icon(
+                          onPressed: isSaving || isSaved ? null : _saveRoutePlan,
+                          icon: const Icon(Icons.save),
+                          label: Text(isSaved ? "Saved" : "Save"),
+                        ),
+                      ),
                     ),
                     Row(
                       children: [
@@ -277,6 +286,7 @@ class RoutePageState extends State<RoutePage> {
                     ),
                   ],
                 ),
+
               ],
             ),
           ),
