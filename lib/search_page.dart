@@ -161,11 +161,17 @@ class SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Search")),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Color(0xFFB3E5FC),
+        elevation: 0,
+        title: Text("Search", style: TextStyle(color: Colors.black)),
+        iconTheme: IconThemeData(color: Colors.black),
+      ),
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.all(16.0),
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -187,23 +193,27 @@ class SearchPageState extends State<SearchPage> {
                 itemCount: searchResults.isEmpty ? recentSearches.length : searchResults.length,
                 itemBuilder: (context, index) {
                   final place = searchResults.isEmpty ? recentSearches[index] : searchResults[index];
-                  return ListTile(
-                    leading: Icon(searchResults.isEmpty ? Icons.history : Icons.location_on),
-                    title: Text(place['name_en']),
-                    subtitle: Text(place['name_it'] ?? ''),
-                    onTap: () async {
-                      if (widget.isSelectingStartPoint) {
-                        Navigator.pop(context, place);
-                      } else {
-                        _addToRecentSearches(place);
-                        final userLocation = await _getUserLocation();
-                        if (userLocation != null) {
-                          _navigateToRoute(place, userLocation);
+                  return Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: Icon(searchResults.isEmpty ? Icons.history : Icons.location_on),
+                      title: Text(place['name_en']),
+                      subtitle: Text(place['name_it'] ?? ''),
+                      onTap: () async {
+                        if (widget.isSelectingStartPoint) {
+                          Navigator.pop(context, place);
                         } else {
-                          _showError();
+                          _addToRecentSearches(place);
+                          final userLocation = await _getUserLocation();
+                          if (userLocation != null) {
+                            _navigateToRoute(place, userLocation);
+                          } else {
+                            _showError();
+                          }
                         }
-                      }
-                    },
+                      },
+                    ),
                   );
                 },
               ),
