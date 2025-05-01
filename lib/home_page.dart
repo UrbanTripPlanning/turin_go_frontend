@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_page.dart';
+import 'route_page.dart';
 import 'api/map.dart';
 import 'dart:convert';
 
@@ -28,6 +29,8 @@ class _HomePageState extends State<HomePage> {
   MapController mapController = MapController();
   bool _isMapMoving = false;
   List<Polyline> _trafficPolylines = [];
+  LatLng? _pinnedPoint;
+  bool _showPin = false;
 
   @override
   void initState() {
@@ -90,6 +93,61 @@ class _HomePageState extends State<HomePage> {
     return Future.value(result);
   }
 
+  void _showDirectionSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.all(16),
+          height: 160,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Navigate to pinned location?", style: TextStyle(fontSize: 16)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.cancel),
+                    label: Text("Cancel"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+                    onPressed: () {
+                      setState(() {
+                        _showPin = false;
+                        _pinnedPoint = null;
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.directions),
+                    label: Text("Direction"),
+                    onPressed: () {
+                      if (_currentPosition != null && _pinnedPoint != null) {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RoutePage(
+                              startName: 'Current Location',
+                              endName: 'Pinned Location',
+                              startCoord: [_currentPosition!.longitude, _currentPosition!.latitude],
+                              endCoord: [_pinnedPoint!.longitude, _pinnedPoint!.latitude],
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              )
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,6 +160,13 @@ class _HomePageState extends State<HomePage> {
               zoom: 15.0,
               maxZoom: 18.0,
               minZoom: 10.0,
+              onLongPress: (_, latlng) {
+                setState(() {
+                  _pinnedPoint = latlng;
+                  _showPin = true;
+                });
+                _showDirectionSheet();
+              },
               onPositionChanged: (position, hasGesture) {
                 if (hasGesture) {
                   setState(() => _isMapMoving = true);
@@ -130,6 +195,17 @@ class _HomePageState extends State<HomePage> {
                       height: 80.0,
                       point: _currentPosition!,
                       child: Icon(Icons.location_on, color: Colors.blue, size: 40),
+                    ),
+                  ],
+                ),
+              if (_showPin && _pinnedPoint != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      width: 80.0,
+                      height: 80.0,
+                      point: _pinnedPoint!,
+                      child: Icon(Icons.location_pin, color: Colors.red, size: 40),
                     ),
                   ],
                 ),
@@ -196,4 +272,3 @@ class _HomePageState extends State<HomePage> {
     return Colors.red;
   }
 }
-
