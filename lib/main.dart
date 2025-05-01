@@ -1,4 +1,4 @@
-import 'dart:io'; // For Platform checks
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
@@ -17,23 +17,18 @@ void main() async {
   // Initialize local notifications
   await NotificationService.initialize();
 
-  if (Platform.isAndroid) {
-    await _requestAndroidPermissions();
+  if (!kIsWeb) {
+    await _requestMobilePermissions();
   }
 
   runApp(MyApp());
 }
 
-Future<void> _requestAndroidPermissions() async {
-  // Request location permission
-  var locationStatus = await Permission.location.request();
-
-  // Optional: Handle denied/limited if needed
-  if (locationStatus.isDenied) {
-    print("Location permission denied");
+Future<void> _requestMobilePermissions() async {
+  if (await Permission.location.isDenied) {
+    await Permission.location.request();
   }
 
-  // Request notification permission (required on Android 13+)
   if (await Permission.notification.isDenied) {
     await Permission.notification.request();
   }
@@ -89,4 +84,3 @@ class MainPageState extends State<MainPage> {
     );
   }
 }
-
