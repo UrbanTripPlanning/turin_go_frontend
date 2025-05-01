@@ -132,6 +132,48 @@ class RoutePageState extends State<RoutePage> {
     }
   }
 
+  void _saveRoutePlan() async {
+    setState(() {
+      isSaving = true;
+      errorMessage = null;
+    });
+
+    if (userId == null) {
+      // TODO: local saved
+      return;
+    }
+
+    try {
+      final result = await RoadApi.saveRoute(
+        planId: widget.planId ?? '',
+        userId: userId ?? '',
+        start: startCoordLocal,
+        end: widget.endCoord,
+        spendTime: _isWalking ? walkingMinutes : drivingMinutes,
+        timeMode: timeMode.index,
+        startName: startNameLocal,
+        endName: widget.endName,
+        routeMode: _isWalking ? 0 : 1,
+        startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+        endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+      );
+
+      setState(() {
+        isSaving = false;
+        if (result['data'] == null) {
+          isSaved = true;
+        } else {
+          errorMessage = 'Failed to save route plan: ${result['data']}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Failed to save route plan: ${e.toString()}';
+        isSaving = false;
+      });
+    }
+  }
+
   String _formatDistance(dynamic distanceMeters) {
     if (distanceMeters < 1000) return "$distanceMeters m";
     return "${(distanceMeters / 1000).toStringAsFixed(1)} km";
@@ -196,7 +238,7 @@ class RoutePageState extends State<RoutePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Color(0xFFADD8E6), // match saved page top bar
+        backgroundColor: Color(0xFFADD8E6),
         elevation: 0,
         title: const Text('Route Planner', style: TextStyle(color: Colors.black)),
         iconTheme: const IconThemeData(color: Colors.black),
@@ -371,11 +413,5 @@ class RoutePageState extends State<RoutePage> {
         ],
       ],
     );
-  }
-
-  void _saveRoutePlan() {
-    setState(() {
-      isSaved = true;
-    });
   }
 }
