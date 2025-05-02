@@ -3,8 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
 import 'glass_container.dart';
 import 'api/common.dart';
+import 'trip_update_service.dart';
+import 'message_box_page.dart';
 
 class SettingsPage extends StatefulWidget {
+  final VoidCallback onMessagesRead;
+  SettingsPage({required this.onMessagesRead});
+
   @override
   SettingsPageState createState() => SettingsPageState();
 }
@@ -17,6 +22,7 @@ class SettingsPageState extends State<SettingsPage> {
   bool notificationsEnabled = false;
   String? userId;
   bool isRegistering = false;
+  int unreadMessageCount = 0;
   final String appVersion = 'v0.0.1';
 
   late TextEditingController _usernameController;
@@ -47,17 +53,31 @@ class SettingsPageState extends State<SettingsPage> {
       userId = prefs.getString('userId');
       username = prefs.getString('username') ?? '';
       notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
+      unreadMessageCount = prefs.getStringList('tripMessages')?.length ?? 0;
     });
+
+    if (userId != null && notificationsEnabled) {
+      TripUpdateService().initialize(
+        userId: userId!,
+        notificationsEnabled: true,
+        onNewMessage: (count) {
+          if (!mounted) return;
+          setState(() => unreadMessageCount = count);
+        },
+      );
+    }
   }
 
   Future<void> _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('userId');
     await prefs.remove('username');
+    await prefs.remove('tripMessages');
     if (!mounted) return;
     setState(() {
       userId = null;
       username = '';
+      unreadMessageCount = 0;
       _usernameController.clear();
       _passwordController.clear();
       _confirmPasswordController.clear();
@@ -113,7 +133,6 @@ class SettingsPageState extends State<SettingsPage> {
   Future<void> _saveSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notificationsEnabled', notificationsEnabled);
-
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Settings saved successfully')),
@@ -147,6 +166,29 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _styledButton({
+    required String text,
+    required VoidCallback onPressed,
+    Color background = Colors.blue,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: background,
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        child: Text(text),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,17 +208,13 @@ class SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(20),
               child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
                       isRegistering ? 'Register' : 'Login',
                       style: const TextStyle(fontSize: 26, color: Colors.black87),
                     ),
                     const SizedBox(height: 20),
-                    TextField(
-                      controller: _usernameController,
-                      decoration: _inputDecoration('Username'),
-                    ),
+                    TextField(controller: _usernameController, decoration: _inputDecoration('Username')),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _passwordController,
@@ -188,8 +226,9 @@ class SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ),
-                    if (isRegistering) ...[
+                    if (isRegistering)
                       const SizedBox(height: 12),
+                    if (isRegistering)
                       TextField(
                         controller: _confirmPasswordController,
                         obscureText: !passwordVisible,
@@ -200,20 +239,15 @@ class SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                       ),
-                    ],
                     const SizedBox(height: 20),
-                    ElevatedButton(
+                    _styledButton(
+                      text: isRegistering ? 'Register' : 'Login',
                       onPressed: () {
                         username = _usernameController.text.trim();
                         password = _passwordController.text.trim();
                         confirmPassword = _confirmPasswordController.text.trim();
                         _loginOrRegister();
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(isRegistering ? 'Register' : 'Login'),
                     ),
                     TextButton(
                       onPressed: () => setState(() => isRegistering = !isRegistering),
@@ -236,7 +270,6 @@ class SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
               child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text('Logged in as: $username', style: const TextStyle(color: Colors.black87)),
                     const SizedBox(height: 20),
@@ -249,37 +282,41 @@ class SettingsPageState extends State<SettingsPage> {
                         await prefs.setBool('notificationsEnabled', value);
                       },
                     ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
+                    _styledButton(
+                      text: 'Save Settings',
                       onPressed: _saveSettings,
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Save Settings'),
                     ),
-                    const SizedBox(height: 10),
                     if (notificationsEnabled)
-                      ElevatedButton(
+                      _styledButton(
+                        text: 'Test the Notification',
                         onPressed: () {
                           _testNotification();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Test notification will appear in 5 seconds')),
                           );
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Test the Notification'),
+                        background: Colors.orange,
                       ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
+                    _styledButton(
+                      text: 'View Trip Alerts',
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MessageBoxPage(onMessagesRead: widget.onMessagesRead),
+                          ),
+                        );
+                        SharedPreferences prefs = await SharedPreferences.getInstance();
+                        await prefs.setStringList('tripMessages', []);
+                        setState(() => unreadMessageCount = 0);
+                        widget.onMessagesRead();
+                      },
+                      background: Colors.indigo,
+                    ),
+                    _styledButton(
+                      text: 'Logout',
                       onPressed: _logout,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Logout'),
+                      background: Colors.redAccent,
                     ),
                     const SizedBox(height: 30),
                     Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
@@ -293,3 +330,4 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 }
+
