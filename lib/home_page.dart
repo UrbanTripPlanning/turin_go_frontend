@@ -3,13 +3,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' as html;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_page.dart';
 import 'route_page.dart';
 import 'api/map.dart';
 import 'dart:convert';
+import 'platform/web_only.dart' if (dart.library.io) 'platform/mobile_only.dart';
 
 class TrafficPoint {
   final LatLng start;
@@ -54,24 +54,17 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _determinePosition() async {
     if (kIsWeb) {
-      try {
-        html.window.navigator.geolocation.getCurrentPosition().then((pos) async {
-          final location = LatLng(
-            pos.coords?.latitude?.toDouble() ?? 45.06288,
-            pos.coords?.longitude?.toDouble() ?? 7.66277,
-          );
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(_locationKey, json.encode({
-            'latitude': location.latitude,
-            'longitude': location.longitude,
-            'timestamp': DateTime.now().millisecondsSinceEpoch,
-          }));
-          setState(() {
-            _currentPosition = location;
-          });
-        }).catchError((e) => print("Web location error: $e"));
-      } catch (e) {
-        print("Exception in web geolocation: $e");
+      final location = await getWebPosition();
+      if (location != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_locationKey, json.encode({
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        }));
+        setState(() {
+          _currentPosition = location;
+        });
       }
       return;
     }
@@ -304,4 +297,3 @@ class _HomePageState extends State<HomePage> {
     return Colors.red;
   }
 }
-
