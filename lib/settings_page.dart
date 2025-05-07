@@ -1,3 +1,4 @@
+// Fully updated SettingsPage with unread trip alert count and visual improvements
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
@@ -148,44 +149,43 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: Colors.grey.shade800),
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.9),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
+  Widget _userInfoCard() {
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.grey.shade200,
+            child: Icon(Icons.person, size: 32, color: Colors.black87),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(username, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                Text('Logged in', style: TextStyle(color: Colors.grey.shade600)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _styledButton({
-    required String text,
-    required VoidCallback onPressed,
-    Color background = Colors.blue,
-  }) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: background,
-          elevation: 3,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-        child: Text(text),
-      ),
+  Widget _fiatTile(String title, IconData icon, VoidCallback onTap, {Color? color}) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? Colors.black87),
+      title: Text(title, style: TextStyle(color: color ?? Colors.black87)),
+      onTap: onTap,
     );
   }
 
@@ -194,137 +194,112 @@ class SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFADD8E6),
+        backgroundColor: const Color(0xFFB3E5FC),
         elevation: 0,
         centerTitle: true,
-        title: const Text('Settings', style: TextStyle(color: Colors.black)),
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: const Text('Settings', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
+        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: SafeArea(
         child: userId == null
             ? Center(
-          child: GlassContainer(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Text(
-                      isRegistering ? 'Register' : 'Login',
-                      style: const TextStyle(fontSize: 26, color: Colors.black87),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Text(isRegistering ? 'Register' : 'Login', style: const TextStyle(fontSize: 26)),
+                  const SizedBox(height: 20),
+                  TextField(controller: _usernameController, decoration: InputDecoration(labelText: 'Username')),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: !passwordVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setState(() => passwordVisible = !passwordVisible),
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    TextField(controller: _usernameController, decoration: _inputDecoration('Username')),
+                  ),
+                  if (isRegistering) ...[
                     const SizedBox(height: 12),
                     TextField(
-                      controller: _passwordController,
+                      controller: _confirmPasswordController,
                       obscureText: !passwordVisible,
-                      decoration: _inputDecoration('Password').copyWith(
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password',
                         suffixIcon: IconButton(
                           icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
                           onPressed: () => setState(() => passwordVisible = !passwordVisible),
                         ),
                       ),
                     ),
-                    if (isRegistering)
-                      const SizedBox(height: 12),
-                    if (isRegistering)
-                      TextField(
-                        controller: _confirmPasswordController,
-                        obscureText: !passwordVisible,
-                        decoration: _inputDecoration('Confirm Password').copyWith(
-                          suffixIcon: IconButton(
-                            icon: Icon(passwordVisible ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => passwordVisible = !passwordVisible),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                    _styledButton(
-                      text: isRegistering ? 'Register' : 'Login',
+                  ],
+                  const SizedBox(height: 20),
+                  Container(
+                    width: double.infinity,
+                    child: ElevatedButton(
                       onPressed: () {
                         username = _usernameController.text.trim();
                         password = _passwordController.text.trim();
                         confirmPassword = _confirmPasswordController.text.trim();
                         _loginOrRegister();
                       },
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() => isRegistering = !isRegistering),
-                      child: Text(
-                        isRegistering ? 'Already have an account? Login' : 'Don\'t have an account? Register',
-                        style: const TextStyle(color: Colors.black54),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 17),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
+                      child: Text(isRegistering ? 'Register' : 'Login'),
                     ),
-                    const SizedBox(height: 30),
-                    Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
-                  ],
-                ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => isRegistering = !isRegistering),
+                    child: Text(isRegistering ? 'Already have an account? Login' : 'Don\'t have an account? Register'),
+                  ),
+                  const SizedBox(height: 30),
+                  Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+                ],
               ),
             ),
           ),
         )
-            : Center(
-          child: GlassContainer(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Text('Logged in as: $username', style: const TextStyle(color: Colors.black87)),
-                    const SizedBox(height: 20),
-                    SwitchListTile(
-                      title: const Text('Enable Notifications', style: TextStyle(color: Colors.black87)),
-                      value: notificationsEnabled,
-                      onChanged: (bool value) async {
-                        setState(() => notificationsEnabled = value);
-                        SharedPreferences prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('notificationsEnabled', value);
-                      },
-                    ),
-                    _styledButton(
-                      text: 'Save Settings',
-                      onPressed: _saveSettings,
-                    ),
-                    if (notificationsEnabled)
-                      _styledButton(
-                        text: 'Test the Notification',
-                        onPressed: () {
-                          _testNotification();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Test notification will appear in 5 seconds')),
-                          );
-                        },
-                        background: Colors.orange,
-                      ),
-                    _styledButton(
-                      text: 'View Trip Alerts',
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MessageBoxPage(onMessagesRead: widget.onMessagesRead),
-                          ),
-                        );
-                        SharedPreferences prefs = await SharedPreferences.getInstance();
-                        await prefs.setStringList('tripMessages', []);
-                        setState(() => unreadMessageCount = 0);
-                        widget.onMessagesRead();
-                      },
-                      background: Colors.indigo,
-                    ),
-                    _styledButton(
-                      text: 'Logout',
-                      onPressed: _logout,
-                      background: Colors.redAccent,
-                    ),
-                    const SizedBox(height: 30),
-                    Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
-                  ],
-                ),
-              ),
+            : Column(
+          children: [
+            _userInfoCard(),
+            _fiatTile('Enable Notifications', Icons.notifications_active, () async {
+              setState(() => notificationsEnabled = !notificationsEnabled);
+              SharedPreferences prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('notificationsEnabled', notificationsEnabled);
+            }),
+            if (notificationsEnabled)
+              _fiatTile('Test Notification', Icons.campaign, () {
+                _testNotification();
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Test notification will appear in 5 seconds')));
+              }),
+            _fiatTile(
+              'View Trip Alerts' + (unreadMessageCount > 0 ? ' ($unreadMessageCount)' : ''),
+              Icons.warning_amber,
+                  () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MessageBoxPage(onMessagesRead: widget.onMessagesRead)),
+                );
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.setStringList('tripMessages', []);
+                setState(() => unreadMessageCount = 0);
+                widget.onMessagesRead();
+              },
             ),
-          ),
+            Divider(),
+            Container(
+              color: Colors.red.shade50,
+              child: _fiatTile('Logout', Icons.logout, _logout, color: Colors.redAccent),
+            ),
+            const SizedBox(height: 20),
+            Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+          ],
         ),
       ),
     );
