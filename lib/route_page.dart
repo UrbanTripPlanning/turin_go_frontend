@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
 import 'package:turin_go_frontend/search_page.dart';
+import 'package:turin_go_frontend/saved_page.dart'; // <- added import
+import 'package:turin_go_frontend/map_picker_page.dart';
 
 enum TimeSelectionMode { leaveNow, departAt, arriveBy }
 
@@ -56,6 +58,8 @@ class RoutePageState extends State<RoutePage> {
   late TimeSelectionMode timeMode;
   late String startNameLocal;
   late List<double> startCoordLocal;
+  late String endNameLocal;
+  late List<double> endCoordLocal;
 
   @override
   void initState() {
@@ -64,6 +68,8 @@ class RoutePageState extends State<RoutePage> {
     timeMode = TimeSelectionMode.values[widget.timeMode ?? 0];
     startNameLocal = widget.startName;
     startCoordLocal = widget.startCoord;
+    endNameLocal = widget.endName;
+    endCoordLocal = widget.endCoord;
 
     switch (timeMode) {
       case TimeSelectionMode.leaveNow:
@@ -98,7 +104,7 @@ class RoutePageState extends State<RoutePage> {
     try {
       final result = await RoadApi.searchRoute(
         start: startCoordLocal,
-        end: widget.endCoord,
+        end: endCoordLocal,
         startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
         endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
       );
@@ -131,7 +137,6 @@ class RoutePageState extends State<RoutePage> {
       });
     }
   }
-
   void _saveRoutePlan() async {
     setState(() {
       isSaving = true;
@@ -146,9 +151,9 @@ class RoutePageState extends State<RoutePage> {
         final newPlan = {
           'plan_id': DateTime.now().millisecondsSinceEpoch.toString(),
           'src_name': startNameLocal,
-          'dst_name': widget.endName,
+          'dst_name': endNameLocal,
           'src_loc': startCoordLocal,
-          'dst_loc': widget.endCoord,
+          'dst_loc': endCoordLocal,
           'spend_time': _isWalking ? walkingMinutes : drivingMinutes,
           'time_mode': timeMode.index,
           'start_at': timeMode == TimeSelectionMode.departAt
@@ -167,6 +172,8 @@ class RoutePageState extends State<RoutePage> {
           isSaved = true;
           isSaving = false;
         });
+
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SavedPage()));
       } catch (e) {
         setState(() {
           errorMessage = 'Failed to save trip locally: ${e.toString()}';
@@ -181,20 +188,25 @@ class RoutePageState extends State<RoutePage> {
         planId: widget.planId ?? '',
         userId: userId ?? '',
         start: startCoordLocal,
-        end: widget.endCoord,
+        end: endCoordLocal,
         spendTime: _isWalking ? walkingMinutes : drivingMinutes,
         timeMode: timeMode.index,
         startName: startNameLocal,
-        endName: widget.endName,
+        endName: endNameLocal,
         routeMode: _isWalking ? 0 : 1,
-        startAt: timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
-        endAt: timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : null,
+        startAt: timeMode == TimeSelectionMode.departAt
+            ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
+            : null,
+        endAt: timeMode == TimeSelectionMode.arriveBy
+            ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
+            : null,
       );
 
       setState(() {
         isSaving = false;
         if (result['data'] == null) {
           isSaved = true;
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SavedPage()));
         } else {
           errorMessage = 'Failed to save route plan: ${result['data']}';
         }
@@ -207,10 +219,31 @@ class RoutePageState extends State<RoutePage> {
     }
   }
 
+  void _exchangePoints() {
+    setState(() {
+      final tmpName = startNameLocal;
+      final tmpCoord = startCoordLocal;
+      startNameLocal = endNameLocal;
+      startCoordLocal = endCoordLocal;
+      endNameLocal = tmpName;
+      endCoordLocal = tmpCoord;
+    });
+    _searchRoute();
+  }
 
   String _formatDistance(dynamic distanceMeters) {
     if (distanceMeters < 1000) return "$distanceMeters m";
     return "${(distanceMeters / 1000).toStringAsFixed(1)} km";
+  }
+
+  LatLng _calculateCenter() {
+    if (currentRoutePoints.isEmpty) return LatLng(45.06288, 7.66277);
+    double lat = 0, lng = 0;
+    for (var p in currentRoutePoints) {
+      lat += p.latitude;
+      lng += p.longitude;
+    }
+    return LatLng(lat / currentRoutePoints.length, lng / currentRoutePoints.length);
   }
 
   void _showDatePicker() async {
@@ -257,25 +290,22 @@ class RoutePageState extends State<RoutePage> {
     setState(() => _isWalking = walkSelected);
   }
 
-  LatLng _calculateCenter() {
-    if (currentRoutePoints.isEmpty) return LatLng(45.06288, 7.66277);
-    double lat = 0, lng = 0;
-    for (var p in currentRoutePoints) {
-      lat += p.latitude;
-      lng += p.longitude;
-    }
-    return LatLng(lat / currentRoutePoints.length, lng / currentRoutePoints.length);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Color(0xFFADD8E6),
+        backgroundColor: Color(0xFFB3E5FC),
         elevation: 0,
-        title: const Text('Route Planner', style: TextStyle(color: Colors.black)),
+        title: const Text('Route Planner', style: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.w600)),
         iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.swap_vert, color: Colors.black87),
+            tooltip: "Exchange start & destination",
+            onPressed: _exchangePoints,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -285,7 +315,7 @@ class RoutePageState extends State<RoutePage> {
               children: [
                 buildInputRow("From:", startNameLocal, true),
                 const SizedBox(height: 10),
-                buildInputRow("To:", widget.endName, false),
+                buildInputRow("To:", endNameLocal, false),
                 const SizedBox(height: 10),
                 buildTimeSelector(),
                 const SizedBox(height: 10),
@@ -320,7 +350,6 @@ class RoutePageState extends State<RoutePage> {
                     ),
                   ],
                 ),
-
               ],
             ),
           ),
@@ -373,10 +402,7 @@ class RoutePageState extends State<RoutePage> {
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 16),
-                child: Text(
-                  currentRouteInfo ?? "",
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
+                child: Text(currentRouteInfo ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               )
             ]
         ],
@@ -391,26 +417,33 @@ class RoutePageState extends State<RoutePage> {
         const SizedBox(width: 8),
         Expanded(
           child: GestureDetector(
-            onTap: isStart
-                ? () async {
+            onTap: () async {
               final selectedPlace = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => SearchPage(isSelectingStartPoint: true),
+                  builder: (context) => SearchPage(isSelectingStartPoint: isStart),
                 ),
               );
+
               if (selectedPlace != null) {
                 setState(() {
-                  startNameLocal = selectedPlace['name_en'];
-                  startCoordLocal = [
-                    selectedPlace['Longitude'],
-                    selectedPlace['Latitude']
-                  ];
+                  if (isStart) {
+                    startNameLocal = selectedPlace['name_en'];
+                    startCoordLocal = [
+                      selectedPlace['Longitude'],
+                      selectedPlace['Latitude'],
+                    ];
+                  } else {
+                    endNameLocal = selectedPlace['name_en'];
+                    endCoordLocal = [
+                      selectedPlace['Longitude'],
+                      selectedPlace['Latitude'],
+                    ];
+                  }
                 });
                 _searchRoute();
               }
-            }
-                : null,
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
               decoration: BoxDecoration(
@@ -459,3 +492,4 @@ class RoutePageState extends State<RoutePage> {
     );
   }
 }
+

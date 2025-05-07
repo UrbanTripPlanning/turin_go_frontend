@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_page.dart';
@@ -13,7 +15,6 @@ class TrafficPoint {
   final LatLng start;
   final LatLng end;
   final double flow;
-
   TrafficPoint(this.start, this.end, this.flow);
 }
 
@@ -52,6 +53,29 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _determinePosition() async {
+    if (kIsWeb) {
+      try {
+        html.window.navigator.geolocation.getCurrentPosition().then((pos) async {
+          final location = LatLng(
+            pos.coords?.latitude?.toDouble() ?? 45.06288,
+            pos.coords?.longitude?.toDouble() ?? 7.66277,
+          );
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_locationKey, json.encode({
+            'latitude': location.latitude,
+            'longitude': location.longitude,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          }));
+          setState(() {
+            _currentPosition = location;
+          });
+        }).catchError((e) => print("Web location error: $e"));
+      } catch (e) {
+        print("Exception in web geolocation: $e");
+      }
+      return;
+    }
+
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
 
@@ -96,51 +120,75 @@ class _HomePageState extends State<HomePage> {
   void _showDirectionSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: false,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(16),
-          height: 160,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24, left: 24, right: 24, top: 20),
+          child: Wrap(
             children: [
-              Text("Navigate to pinned location?", style: TextStyle(fontSize: 16)),
+              Center(
+                child: Text(
+                  "Navigate to pinned location?",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                ),
+              ),
+              SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  ElevatedButton.icon(
-                    icon: Icon(Icons.cancel),
-                    label: Text("Cancel"),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-                    onPressed: () {
-                      setState(() {
-                        _showPin = false;
-                        _pinnedPoint = null;
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    icon: Icon(Icons.directions),
-                    label: Text("Direction"),
-                    onPressed: () {
-                      if (_currentPosition != null && _pinnedPoint != null) {
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.cancel),
+                      label: Text("Cancel"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade300,
+                        foregroundColor: Colors.black87,
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showPin = false;
+                          _pinnedPoint = null;
+                        });
                         Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RoutePage(
-                              startName: 'Current Location',
-                              endName: 'Pinned Location',
-                              startCoord: [_currentPosition!.longitude, _currentPosition!.latitude],
-                              endCoord: [_pinnedPoint!.longitude, _pinnedPoint!.latitude],
+                      },
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.directions),
+                      label: Text("Direction"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        if (_currentPosition != null && _pinnedPoint != null) {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RoutePage(
+                                startName: 'Current Location',
+                                endName: 'Pinned Location',
+                                startCoord: [_currentPosition!.longitude, _currentPosition!.latitude],
+                                endCoord: [_pinnedPoint!.longitude, _pinnedPoint!.latitude],
+                              ),
                             ),
-                          ),
-                        );
-                      }
-                    },
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ],
-              )
+              ),
             ],
           ),
         );
@@ -180,43 +228,27 @@ class _HomePageState extends State<HomePage> {
               TileLayer(
                 urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 subdomains: ['a', 'b', 'c'],
-                userAgentPackageName: 'com.example.turinGoFrontend',
               ),
               if (showTraffic && !_isMapMoving)
-                PolylineLayer(
-                  polylines: _trafficPolylines,
-                  polylineCulling: true,
-                ),
+                PolylineLayer(polylines: _trafficPolylines, polylineCulling: true),
               if (_currentPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 80.0,
-                      height: 80.0,
-                      point: _currentPosition!,
-                      child: Icon(Icons.location_on, color: Colors.blue, size: 40),
-                    ),
-                  ],
-                ),
+                MarkerLayer(markers: [
+                  Marker(
+                    width: 80.0,
+                    height: 80.0,
+                    point: _currentPosition!,
+                    child: Icon(Icons.location_on, color: Colors.blue, size: 40),
+                  ),
+                ]),
               if (_showPin && _pinnedPoint != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 80.0,
-                      height: 80.0,
-                      point: _pinnedPoint!,
-                      child: Icon(Icons.location_pin, color: Colors.red, size: 40),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          RichAttributionWidget(
-            attributions: [
-              TextSourceAttribution(
-                'OpenStreetMap contributors',
-                onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
-              )
+                MarkerLayer(markers: [
+                  Marker(
+                    width: 80.0,
+                    height: 80.0,
+                    point: _pinnedPoint!,
+                    child: Icon(Icons.location_pin, color: Colors.red, size: 40),
+                  ),
+                ]),
             ],
           ),
           Positioned(
@@ -227,7 +259,7 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SearchPage()),
+                  MaterialPageRoute(builder: (context) => SearchPage(isSelectingStartPoint: false)),
                 );
               },
               child: Container(
@@ -272,3 +304,4 @@ class _HomePageState extends State<HomePage> {
     return Colors.red;
   }
 }
+

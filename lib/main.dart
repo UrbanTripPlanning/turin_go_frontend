@@ -24,11 +24,10 @@ void startPolling() {
     final userId = prefs.getString('userId');
     if (userId == null) return;
 
-
     final unreadCount = await TripEventService().getUnreadCount();
     unreadEventCountNotifier.value = unreadCount;
 
-    print('🔔 Unread trip alerts: $unreadCount');
+    print('🔔 Unread trip alerts: \$unreadCount');
   });
 }
 
@@ -110,37 +109,61 @@ class MainPageState extends State<MainPage> {
 
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          const BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'Saved'),
-          BottomNavigationBarItem(
-            icon: Stack(
-              children: [
-                const Icon(Icons.settings),
-                if (_unreadCount > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '$_unreadCount',
-                        style: const TextStyle(color: Colors.white, fontSize: 10),
-                      ),
-                    ),
-                  ),
-              ],
+      bottomNavigationBar: SafeArea(
+        bottom: true,
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          iconSize: 30,
+          selectedIconTheme: const IconThemeData(size: 34),
+          unselectedIconTheme: const IconThemeData(size: 30),
+          selectedLabelStyle: const TextStyle(fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
+          items: [
+            BottomNavigationBarItem(
+              icon: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: const Icon(Icons.home),
+              ),
+              label: 'Home',
             ),
-            label: 'Settings',
-          ),
-        ],
+            BottomNavigationBarItem(
+              icon: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: const Icon(Icons.bookmark),
+              ),
+              label: 'Saved',
+            ),
+            BottomNavigationBarItem(
+              icon: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Stack(
+                  children: [
+                    const Icon(Icons.settings),
+                    if (_unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$_unreadCount',
+                            style: const TextStyle(color: Colors.white, fontSize: 10),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              label: 'Settings',
+            ),
+          ],
+        ),
       ),
     );
   }

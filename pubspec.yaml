@@ -18,7 +18,7 @@ dependencies:
   flutter_map: ^6.0.0
   latlong2: ^0.9.1
   url_launcher: ^6.2.5
-  geolocator: ^9.0.2
+  geolocator: ^10.1.0
   shared_preferences: ^2.5.3
   flutter_local_notifications: ^19.1.0
   timezone: ^0.10.0
