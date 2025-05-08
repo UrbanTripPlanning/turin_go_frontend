@@ -1,3 +1,4 @@
+// Updated home_page.dart with conditional import for web geolocation
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -201,7 +202,7 @@ class _HomePageState extends State<HomePage> {
               zoom: 15.0,
               maxZoom: 18.0,
               minZoom: 10.0,
-              onLongPress: (_, latlng) {
+              onTap: (_, latlng) {
                 setState(() {
                   _pinnedPoint = latlng;
                   _showPin = true;
