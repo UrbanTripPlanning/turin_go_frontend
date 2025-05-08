@@ -1,4 +1,3 @@
-// Fully updated SettingsPage with unread trip alert count and visual improvements
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart';
@@ -6,6 +5,7 @@ import 'glass_container.dart';
 import 'api/common.dart';
 import 'trip_update_service.dart';
 import 'message_box_page.dart';
+import 'about_us_page.dart'; // <--- Make sure this file exists
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onMessagesRead;
@@ -250,7 +250,30 @@ class SettingsPageState extends State<SettingsPage> {
                     child: Text(isRegistering ? 'Already have an account? Login' : 'Don\'t have an account? Register'),
                   ),
                   const SizedBox(height: 30),
-                  Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+                  Column(
+                    children: [
+                      Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AboutUsPage()),
+                          );
+                        },
+                        child: Text(
+                          'About Us',
+                          style: TextStyle(
+                            color: Colors.blue.shade700,
+                            fontSize: 16,
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -294,7 +317,30 @@ class SettingsPageState extends State<SettingsPage> {
               child: _fiatTile('Logout', Icons.logout, _logout, color: Colors.redAccent),
             ),
             const SizedBox(height: 20),
-            Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+            Column(
+              children: [
+                Text('App Version: $appVersion', style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AboutUsPage()),
+                    );
+                  },
+                  child: Text(
+                    'About Us',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontSize: 16,
+                      decoration: TextDecoration.underline,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ],
         ),
       ),
