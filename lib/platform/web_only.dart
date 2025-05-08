@@ -5,7 +5,9 @@ import 'dart:html' as html;
 Future<LatLng?> getWebPosition() async {
   try {
     final result = await html.window.navigator.geolocation.getCurrentPosition();
-    return LatLng(result.coords?.latitude ?? 45.06288, result.coords?.longitude ?? 7.66277);
+    final lat = result.coords?.latitude?.toDouble() ?? 45.06288;
+    final lon = result.coords?.longitude?.toDouble() ?? 7.66277;
+    return LatLng(lat, lon);
   } catch (e) {
     print("Web geolocation error: $e");
     return null;
