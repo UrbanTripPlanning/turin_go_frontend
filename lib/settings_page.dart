@@ -131,15 +131,6 @@ class SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _saveSettings() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notificationsEnabled', notificationsEnabled);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Settings saved successfully')),
-    );
-  }
-
   Future<void> _testNotification() async {
     await Future.delayed(Duration(seconds: 5));
     await NotificationService.showNotification(
@@ -268,11 +259,16 @@ class SettingsPageState extends State<SettingsPage> {
             : Column(
           children: [
             _userInfoCard(),
-            _fiatTile('Enable Notifications', Icons.notifications_active, () async {
-              setState(() => notificationsEnabled = !notificationsEnabled);
-              SharedPreferences prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('notificationsEnabled', notificationsEnabled);
-            }),
+            _fiatTile(
+              'Enable Notifications',
+              Icons.notifications_active,
+                  () async {
+                setState(() => notificationsEnabled = !notificationsEnabled);
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('notificationsEnabled', notificationsEnabled);
+              },
+              color: notificationsEnabled ? Colors.blue : Colors.black87,
+            ),
             if (notificationsEnabled)
               _fiatTile('Test Notification', Icons.campaign, () {
                 _testNotification();
@@ -305,4 +301,3 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 }
-
