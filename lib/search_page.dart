@@ -1,3 +1,4 @@
+// Updated search_page.dart with fallback to Politecnico if location fails and disables 'Your Location' if location not available
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/place.dart';
 import 'package:turin_go_frontend/map_picker_page.dart';
 import 'package:turin_go_frontend/route_page.dart';
+
+const LatLng politecnicoCoord = LatLng(45.062331, 7.662690);
 
 class SearchPage extends StatefulWidget {
   final bool isSelectingStartPoint;
@@ -25,12 +28,31 @@ class _SearchPageState extends State<SearchPage> {
   String? errorMessage;
   Timer? _debounce;
   static const String _recentSearchesKey = 'recent_searches';
+  bool _locationAvailable = true;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _loadRecentSearches();
+    _checkLocation();
+  }
+
+  Future<void> _checkLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          setState(() => _locationAvailable = false);
+          return;
+        }
+      }
+      await Geolocator.getCurrentPosition();
+      setState(() => _locationAvailable = true);
+    } catch (_) {
+      setState(() => _locationAvailable = false);
+    }
   }
 
   void _onSearchChanged() {
@@ -74,7 +96,7 @@ class _SearchPageState extends State<SearchPage> {
       });
     } catch (e) {
       setState(() {
-        errorMessage = "Search failed: ${e.toString()}";
+        errorMessage = "Search failed: \${e.toString()}";
         isLoading = false;
       });
     }
@@ -96,14 +118,20 @@ class _SearchPageState extends State<SearchPage> {
           'Longitude': picked.longitude,
         });
       } else {
-        final position = await Geolocator.getCurrentPosition();
+        LatLng start;
+        try {
+          final pos = await Geolocator.getCurrentPosition();
+          start = LatLng(pos.latitude, pos.longitude);
+        } catch (e) {
+          start = politecnicoCoord;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => RoutePage(
-              startName: "Your Location",
+              startName: "Politecnico",
               endName: "Pinned Location",
-              startCoord: [position.longitude, position.latitude],
+              startCoord: [start.longitude, start.latitude],
               endCoord: [picked.longitude, picked.latitude],
             ),
           ),
@@ -113,21 +141,28 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _selectCurrentLocation() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Location permission denied')));
-        return;
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          throw Exception("Denied");
+        }
       }
-    }
 
-    Position pos = await Geolocator.getCurrentPosition();
-    Navigator.pop(context, {
-      'name_en': 'Your Location',
-      'Latitude': pos.latitude,
-      'Longitude': pos.longitude,
-    });
+      Position pos = await Geolocator.getCurrentPosition();
+      Navigator.pop(context, {
+        'name_en': 'Your Location',
+        'Latitude': pos.latitude,
+        'Longitude': pos.longitude,
+      });
+    } catch (e) {
+      Navigator.pop(context, {
+        'name_en': 'Politecnico',
+        'Latitude': politecnicoCoord.latitude,
+        'Longitude': politecnicoCoord.longitude,
+      });
+    }
   }
 
   void _onPlaceTap(Map<String, dynamic> place) async {
@@ -142,14 +177,21 @@ class _SearchPageState extends State<SearchPage> {
       }
       await prefs.setString(_recentSearchesKey, json.encode(recentSearches));
 
-      final position = await Geolocator.getCurrentPosition();
+      LatLng start;
+      try {
+        final pos = await Geolocator.getCurrentPosition();
+        start = LatLng(pos.latitude, pos.longitude);
+      } catch (e) {
+        start = politecnicoCoord;
+      }
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => RoutePage(
-            startName: "Your Location",
+            startName: "Politecnico",
             endName: place['name_en'],
-            startCoord: [position.longitude, position.latitude],
+            startCoord: [start.longitude, start.latitude],
             endCoord: [place['Longitude'], place['Latitude']],
           ),
         ),
@@ -192,9 +234,9 @@ class _SearchPageState extends State<SearchPage> {
             Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.my_location),
-                  title: Text("Your Location"),
-                  onTap: _selectCurrentLocation,
+                  leading: Icon(Icons.my_location, color: _locationAvailable ? null : Colors.grey),
+                  title: Text("Your Location", style: TextStyle(color: _locationAvailable ? null : Colors.grey)),
+                  onTap: _locationAvailable ? _selectCurrentLocation : null,
                 ),
                 ListTile(
                   leading: Icon(Icons.map),
@@ -231,4 +273,3 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 }
-

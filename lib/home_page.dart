@@ -12,6 +12,8 @@ import 'api/map.dart';
 import 'dart:convert';
 import 'platform/web_only.dart' if (dart.library.io) 'platform/mobile_only.dart';
 
+const LatLng politecnicoCoord = LatLng(45.062331, 7.662690);
+
 class TrafficPoint {
   final LatLng start;
   final LatLng end;
@@ -54,45 +56,55 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _determinePosition() async {
-    if (kIsWeb) {
-      final location = await getWebPosition();
-      if (location != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_locationKey, json.encode({
-          'latitude': location.latitude,
-          'longitude': location.longitude,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        }));
-        setState(() {
-          _currentPosition = location;
-        });
+    try {
+      if (kIsWeb) {
+        final location = await getWebPosition();
+        if (location != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_locationKey, json.encode({
+            'latitude': location.latitude,
+            'longitude': location.longitude,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          }));
+          setState(() {
+            _currentPosition = location;
+          });
+          return;
+        } else {
+          throw Exception("Web location null");
+        }
       }
-      return;
+
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) throw Exception("Service disabled");
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          throw Exception("Permission denied");
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      final location = LatLng(position.latitude, position.longitude);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_locationKey, json.encode({
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      }));
+
+      setState(() {
+        _currentPosition = location;
+      });
+    } catch (e) {
+      print("Location fallback to politecnico: \$e");
+      setState(() {
+        _currentPosition = politecnicoCoord;
+      });
     }
-
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
-    if (permission == LocationPermission.deniedForever) return;
-
-    Position position = await Geolocator.getCurrentPosition();
-    final location = LatLng(position.latitude, position.longitude);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_locationKey, json.encode({
-      'latitude': position.latitude,
-      'longitude': position.longitude,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    }));
-
-    setState(() {
-      _currentPosition = location;
-    });
   }
 
   bool showTraffic = false;
@@ -164,15 +176,15 @@ class _HomePageState extends State<HomePage> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () {
-                        if (_currentPosition != null && _pinnedPoint != null) {
+                        if (_pinnedPoint != null) {
                           Navigator.pop(context);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => RoutePage(
-                                startName: 'Current Location',
+                                startName: 'Politecnico',
                                 endName: 'Pinned Location',
-                                startCoord: [_currentPosition!.longitude, _currentPosition!.latitude],
+                                startCoord: [_currentPosition?.longitude ?? politecnicoCoord.longitude, _currentPosition?.latitude ?? politecnicoCoord.latitude],
                                 endCoord: [_pinnedPoint!.longitude, _pinnedPoint!.latitude],
                               ),
                             ),
