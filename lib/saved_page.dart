@@ -150,8 +150,8 @@ class SavedPageState extends State<SavedPage> {
           if (oldDuration != newDuration) {
             await NotificationService.showNotification(
               id: oldTrip['plan_id'].hashCode,
-              title: 'Trip Update',
-              body: 'Trip to ${oldTrip['dst_name']} updated: ${oldDuration} min ➔ ${newDuration} min',
+              title: "Trip Update",
+              body: "Trip to ${oldTrip['dst_name']} updated: ${oldDuration} min ➔ ${newDuration} min",
             );
           }
         }
@@ -164,16 +164,37 @@ class SavedPageState extends State<SavedPage> {
   List _getLeaveTime(Map trip) {
     String dt;
     if (trip['time_mode'] == 1) {
-      dt = DateTime.fromMillisecondsSinceEpoch(trip['start_at'] * 1000)
-          .toLocal()
-          .toString();
+      dt = DateTime.fromMillisecondsSinceEpoch(trip['start_at'] * 1000).toLocal().toString();
     } else {
-      dt = DateTime.fromMillisecondsSinceEpoch(
-          (trip['end_at'] - trip['spend_time'] * 60) * 1000)
-          .toLocal()
-          .toString();
+      dt = DateTime.fromMillisecondsSinceEpoch((trip['end_at'] - trip['spend_time'] * 60) * 1000).toLocal().toString();
     }
     return [dt.split(' ')[0], dt.split(' ')[1].substring(0, 5)];
+  }
+
+  String _getModeText(int mode) {
+    switch (mode) {
+      case 0:
+        return 'walking';
+      case 1:
+        return 'driving';
+      case 2:
+        return 'cycling';
+      default:
+        return 'unknown';
+    }
+  }
+
+  Color _getBottomStripColor(int mode) {
+    switch (mode) {
+      case 0:
+        return Colors.green;
+      case 1:
+        return Colors.blue;
+      case 2:
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -206,19 +227,20 @@ class SavedPageState extends State<SavedPage> {
               ),
             )
                 : ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               itemCount: planList.length,
               itemBuilder: (context, index) {
                 final trip = planList[index];
                 final leaveTime = _getLeaveTime(trip);
+                final stripColor = _getBottomStripColor(trip['route_mode']);
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Container(
+                    height: 120,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -227,124 +249,106 @@ class SavedPageState extends State<SavedPage> {
                         ),
                       ],
                     ),
-                    child: ListTile(
-                      title: Text(
-                        'To: ${trip['dst_name']}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          Text(
-                            'Leave by ${leaveTime[0]} ${leaveTime[1]}',
-                            style: const TextStyle(
-                                color: Colors.black54),
-                          ),
-                          Text(
-                            'From ${trip['src_name']} To ${trip['dst_name']}',
-                            style: const TextStyle(
-                                color: Colors.black54),
-                          ),
-                          Text(
-                            'Duration: ${trip['spend_time']} min  By ${trip['route_mode'] == 0 ? 'walking' : 'driving'}',
-                            style: const TextStyle(
-                                color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            color: Colors.red),
-                        onPressed: () async {
-                          final confirmed =
-                          await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Delete Trip'),
-                              content: const Text(
-                                  'Are you sure you want to delete this trip?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: const Text('No'),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  child: const Text('Yes'),
-                                ),
-                              ],
+                    child: Stack(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: ListTile(
+                            title: Text(
+                              "To: ${trip['dst_name']}",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
                             ),
-                          );
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Leave by ${leaveTime[0]} ${leaveTime[1]}", style: TextStyle(color: Colors.grey.shade700)),
+                                  Text("From ${trip['src_name']} To ${trip['dst_name']}", style: TextStyle(color: Colors.grey.shade700)),
+                                  Text("Duration: ${trip['spend_time']} min  By ${_getModeText(trip['route_mode'])}", style: TextStyle(color: Colors.grey.shade700)),
+                                ],
+                              ),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Trip'),
+                                    content: const Text('Are you sure you want to delete this trip?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(false),
+                                        child: const Text('No'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(true),
+                                        child: const Text('Yes'),
+                                      ),
+                                    ],
+                                  ),
+                                );
 
-                          if (confirmed == true) {
-                            try {
-                              if (userId == null) {
-                                SharedPreferences prefs =
-                                await SharedPreferences
-                                    .getInstance();
-                                List<String> savedPlans =
-                                    prefs.getStringList(
-                                        'savedPlans') ??
-                                        [];
-                                savedPlans.removeWhere((plan) {
-                                  final map =
-                                  json.decode(plan);
-                                  return map['plan_id'] ==
-                                      trip['plan_id'];
-                                });
-                                await prefs.setStringList(
-                                    'savedPlans', savedPlans);
-                                setState(() =>
-                                    planList.removeAt(index));
-                              } else {
-                                await RoadApi.deleteRoute(
-                                    planId: trip['plan_id']);
-                                setState(() =>
-                                    planList.removeAt(index));
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(
-                                SnackBar(
-                                    content: Text(
-                                        'Failed to delete trip: ${e.toString()}')),
+                                if (confirmed == true) {
+                                  try {
+                                    if (userId == null) {
+                                      SharedPreferences prefs = await SharedPreferences.getInstance();
+                                      List<String> savedPlans = prefs.getStringList('savedPlans') ?? [];
+                                      savedPlans.removeWhere((plan) {
+                                        final map = json.decode(plan);
+                                        return map['plan_id'] == trip['plan_id'];
+                                      });
+                                      await prefs.setStringList('savedPlans', savedPlans);
+                                      setState(() => planList.removeAt(index));
+                                    } else {
+                                      await RoadApi.deleteRoute(planId: trip['plan_id']);
+                                      setState(() => planList.removeAt(index));
+                                    }
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to delete trip: ${e.toString()}')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => RoutePage(
+                                    startName: trip['src_name'],
+                                    endName: trip['dst_name'],
+                                    startCoord: (trip['src_loc'] as List).map((e) => (e as num).toDouble()).toList(),
+                                    endCoord: (trip['dst_loc'] as List).map((e) => (e as num).toDouble()).toList(),
+                                    planId: trip['plan_id'],
+                                    routeMode: trip['route_mode'],
+                                    timeMode: trip['time_mode'],
+                                    startAt: trip['start_at'],
+                                    endAt: trip['end_at'],
+                                  ),
+                                ),
                               );
-                            }
-                          }
-                        },
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RoutePage(
-                              startName: trip['src_name'],
-                              endName: trip['dst_name'],
-                              startCoord: (trip['src_loc'] as List)
-                                  .map((e) =>
-                                  (e as num).toDouble())
-                                  .toList(),
-                              endCoord: (trip['dst_loc'] as List)
-                                  .map((e) =>
-                                  (e as num).toDouble())
-                                  .toList(),
-                              planId: trip['plan_id'],
-                              routeMode: trip['route_mode'],
-                              timeMode: trip['time_mode'],
-                              startAt: trip['start_at'],
-                              endAt: trip['end_at'],
+                            },
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: stripColor,
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(12),
+                                bottomRight: Radius.circular(12),
+                              ),
                             ),
                           ),
-                        );
-                      },
+                        )
+                      ],
                     ),
                   ),
                 );
@@ -356,4 +360,3 @@ class SavedPageState extends State<SavedPage> {
     );
   }
 }
-

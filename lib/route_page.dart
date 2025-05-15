@@ -5,10 +5,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/road.dart';
 import 'package:turin_go_frontend/search_page.dart';
-import 'package:turin_go_frontend/saved_page.dart'; // <- added import
+import 'package:turin_go_frontend/saved_page.dart';
 import 'package:turin_go_frontend/map_picker_page.dart';
+import 'package:turin_go_frontend/main.dart';
 
 enum TimeSelectionMode { leaveNow, departAt, arriveBy }
+enum RouteMode { walking, driving, cycling }
 
 class RoutePage extends StatefulWidget {
   final String startName;
@@ -41,18 +43,43 @@ class RoutePageState extends State<RoutePage> {
   String? userId;
   List<LatLng> walkingRoutePoints = [];
   List<LatLng> drivingRoutePoints = [];
-  late bool _isWalking;
+  List<LatLng> cyclingRoutePoints = [];
+  late RouteMode _routeMode;
+
+  List<LatLng> get currentRoutePoints {
+    switch (_routeMode) {
+      case RouteMode.walking:
+        return walkingRoutePoints;
+      case RouteMode.driving:
+        return drivingRoutePoints;
+      case RouteMode.cycling:
+        return cyclingRoutePoints;
+    }
+  }
+
   bool get _hasRoute => currentRoutePoints.isNotEmpty;
-  List<LatLng> get currentRoutePoints => _isWalking ? walkingRoutePoints : drivingRoutePoints;
   bool isLoading = false;
   bool isSaved = false;
   bool isSaving = false;
   String? errorMessage;
   String? walkingRouteInfo;
   String? drivingRouteInfo;
-  int drivingMinutes = 0;
+  String? cyclingRouteInfo;
   int walkingMinutes = 0;
-  String? get currentRouteInfo => _isWalking ? walkingRouteInfo : drivingRouteInfo;
+  int drivingMinutes = 0;
+  int cyclingMinutes = 0;
+
+  String? get currentRouteInfo {
+    switch (_routeMode) {
+      case RouteMode.walking:
+        return walkingRouteInfo;
+      case RouteMode.driving:
+        return drivingRouteInfo;
+      case RouteMode.cycling:
+        return cyclingRouteInfo;
+    }
+  }
+
   MapController mapController = MapController();
   late DateTime selectedDateTime;
   late TimeSelectionMode timeMode;
@@ -64,7 +91,7 @@ class RoutePageState extends State<RoutePage> {
   @override
   void initState() {
     super.initState();
-    _isWalking = widget.routeMode == null ? true : widget.routeMode == 0;
+    _routeMode = RouteMode.values[widget.routeMode ?? 0];
     timeMode = TimeSelectionMode.values[widget.timeMode ?? 0];
     startNameLocal = widget.startName;
     startCoordLocal = widget.startCoord;
@@ -112,20 +139,19 @@ class RoutePageState extends State<RoutePage> {
       setState(() {
         Map walkingData = result['data']['walking'];
         Map drivingData = result['data']['driving'];
+        Map cyclingData = result['data']['cycling'];
 
-        walkingRoutePoints = List<LatLng>.from(
-          walkingData['routes'].map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble())),
-        );
-
-        drivingRoutePoints = List<LatLng>.from(
-          drivingData['routes'].map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble())),
-        );
+        walkingRoutePoints = List<LatLng>.from(walkingData['routes'].map((c) => LatLng(c[1], c[0])));
+        drivingRoutePoints = List<LatLng>.from(drivingData['routes'].map((c) => LatLng(c[1], c[0])));
+        cyclingRoutePoints = List<LatLng>.from(cyclingData['routes'].map((c) => LatLng(c[1], c[0])));
 
         walkingMinutes = walkingData['times'];
         drivingMinutes = drivingData['times'];
+        cyclingMinutes = cyclingData['times'];
 
         walkingRouteInfo = "${walkingMinutes} min (${_formatDistance(walkingData['distances'])})";
         drivingRouteInfo = "${drivingMinutes} min (${_formatDistance(drivingData['distances'])})";
+        cyclingRouteInfo = "${cyclingMinutes} min (${_formatDistance(cyclingData['distances'])})";
 
         isSaved = false;
         isLoading = false;
@@ -137,98 +163,8 @@ class RoutePageState extends State<RoutePage> {
       });
     }
   }
-  void _saveRoutePlan() async {
-    setState(() {
-      isSaving = true;
-      errorMessage = null;
-    });
-
-    if (userId == null) {
-      try {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        List<String> savedPlans = prefs.getStringList('savedPlans') ?? [];
-
-        final newPlan = {
-          'plan_id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'src_name': startNameLocal,
-          'dst_name': endNameLocal,
-          'src_loc': startCoordLocal,
-          'dst_loc': endCoordLocal,
-          'spend_time': _isWalking ? walkingMinutes : drivingMinutes,
-          'time_mode': timeMode.index,
-          'start_at': timeMode == TimeSelectionMode.departAt
-              ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
-              : 0,
-          'end_at': timeMode == TimeSelectionMode.arriveBy
-              ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
-              : 0,
-          'route_mode': _isWalking ? 0 : 1,
-        };
-
-        savedPlans.add(json.encode(newPlan));
-        await prefs.setStringList('savedPlans', savedPlans);
-
-        setState(() {
-          isSaved = true;
-          isSaving = false;
-        });
-
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SavedPage()));
-      } catch (e) {
-        setState(() {
-          errorMessage = 'Failed to save trip locally: ${e.toString()}';
-          isSaving = false;
-        });
-      }
-      return;
-    }
-
-    try {
-      final result = await RoadApi.saveRoute(
-        planId: widget.planId ?? '',
-        userId: userId ?? '',
-        start: startCoordLocal,
-        end: endCoordLocal,
-        spendTime: _isWalking ? walkingMinutes : drivingMinutes,
-        timeMode: timeMode.index,
-        startName: startNameLocal,
-        endName: endNameLocal,
-        routeMode: _isWalking ? 0 : 1,
-        startAt: timeMode == TimeSelectionMode.departAt
-            ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
-            : null,
-        endAt: timeMode == TimeSelectionMode.arriveBy
-            ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
-            : null,
-      );
-
-      setState(() {
-        isSaving = false;
-        if (result['data'] == null) {
-          isSaved = true;
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => SavedPage()));
-        } else {
-          errorMessage = 'Failed to save route plan: ${result['data']}';
-        }
-      });
-    } catch (e) {
-      setState(() {
-        errorMessage = 'Failed to save route plan: ${e.toString()}';
-        isSaving = false;
-      });
-    }
-  }
-
-  void _exchangePoints() {
-    setState(() {
-      final tmpName = startNameLocal;
-      final tmpCoord = startCoordLocal;
-      startNameLocal = endNameLocal;
-      startCoordLocal = endCoordLocal;
-      endNameLocal = tmpName;
-      endCoordLocal = tmpCoord;
-    });
-    _searchRoute();
+  void _toggleMode(RouteMode mode) {
+    setState(() => _routeMode = mode);
   }
 
   String _formatDistance(dynamic distanceMeters) {
@@ -251,7 +187,7 @@ class RoutePageState extends State<RoutePage> {
       context: context,
       initialDate: selectedDateTime,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 7)),
+      lastDate: DateTime.now().add(const Duration(days: 7)),
     );
     if (picked != null) {
       setState(() {
@@ -286,8 +222,96 @@ class RoutePageState extends State<RoutePage> {
     }
   }
 
-  void _toggleMode(bool walkSelected) {
-    setState(() => _isWalking = walkSelected);
+
+
+
+  void _exchangePoints() {
+    setState(() {
+      final tmpName = startNameLocal;
+      final tmpCoord = startCoordLocal;
+      startNameLocal = endNameLocal;
+      startCoordLocal = endCoordLocal;
+      endNameLocal = tmpName;
+      endCoordLocal = tmpCoord;
+    });
+    _searchRoute();
+  }
+
+  void _saveRoutePlan() async {
+    setState(() {
+      isSaving = true;
+      errorMessage = null;
+    });
+
+    final tripData = {
+      'plan_id': widget.planId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      'src_name': startNameLocal,
+      'dst_name': endNameLocal,
+      'src_loc': startCoordLocal,
+      'dst_loc': endCoordLocal,
+      'spend_time': _getCurrentMinutes(),
+      'time_mode': timeMode.index,
+      'start_at': timeMode == TimeSelectionMode.departAt ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : 0,
+      'end_at': timeMode == TimeSelectionMode.arriveBy ? selectedDateTime.millisecondsSinceEpoch ~/ 1000 : 0,
+      'route_mode': _routeMode.index,
+    };
+
+    if (userId == null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String> savedPlans = prefs.getStringList('savedPlans') ?? [];
+      savedPlans.add(json.encode(tripData));
+      await prefs.setStringList('savedPlans', savedPlans);
+      setState(() {
+        isSaved = true;
+        isSaving = false;
+      });
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainPage()));
+    } else {
+      try {
+        final result = await RoadApi.saveRoute(
+          planId: widget.planId ?? '',
+          userId: userId!,
+          start: startCoordLocal,
+          end: endCoordLocal,
+          spendTime: _getCurrentMinutes(),
+          timeMode: timeMode.index,
+          startName: startNameLocal,
+          endName: endNameLocal,
+          routeMode: _routeMode.index,
+          startAt: timeMode == TimeSelectionMode.departAt
+              ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
+              : 0,
+          endAt: timeMode == TimeSelectionMode.arriveBy
+              ? selectedDateTime.millisecondsSinceEpoch ~/ 1000
+              : 0,
+        );
+
+
+        setState(() {
+          isSaved = result['data'] == null;
+          isSaving = false;
+        });
+        if (isSaved) {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainPage()));
+        }
+      } catch (e) {
+        setState(() {
+          errorMessage = 'Failed to save route plan: ${e.toString()}';
+          isSaving = false;
+        });
+      }
+    }
+  }
+
+  int _getCurrentMinutes() {
+    switch (_routeMode) {
+      case RouteMode.walking:
+        return walkingMinutes;
+      case RouteMode.driving:
+        return drivingMinutes;
+      case RouteMode.cycling:
+        return cyclingMinutes;
+    }
   }
 
   @override
@@ -297,54 +321,54 @@ class RoutePageState extends State<RoutePage> {
       appBar: AppBar(
         backgroundColor: Color(0xFFB3E5FC),
         elevation: 0,
-        title: const Text('Route Planner', style: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.w600)),
+        title: const Text('Route Planner', style: TextStyle(color: Colors.black)),
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            icon: Icon(Icons.swap_vert, color: Colors.black87),
-            tooltip: "Exchange start & destination",
+            icon: Icon(Icons.swap_vert),
             onPressed: _exchangePoints,
+            tooltip: "Swap start and end",
           ),
         ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 buildInputRow("From:", startNameLocal, true),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 buildInputRow("To:", endNameLocal, false),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 buildTimeSelector(),
-                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    SizedBox(
-                      width: 130,
-                      child: Visibility(
-                        visible: timeMode != TimeSelectionMode.leaveNow,
-                        maintainSize: true,
-                        maintainAnimation: true,
-                        maintainState: true,
-                        child: ElevatedButton.icon(
-                          onPressed: isSaving || isSaved ? null : _saveRoutePlan,
-                          icon: const Icon(Icons.save),
-                          label: Text(isSaved ? "Saved" : "Save"),
-                        ),
+                    Visibility(
+                      visible: timeMode != TimeSelectionMode.leaveNow,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: ElevatedButton.icon(
+                        onPressed: isSaved || isSaving ? null : _saveRoutePlan,
+                        icon: Icon(Icons.save),
+                        label: Text(isSaved ? "Saved" : "Save"),
                       ),
                     ),
                     Row(
                       children: [
                         IconButton(
-                          icon: Icon(Icons.directions_walk, color: _isWalking ? Colors.blue : Colors.black26),
-                          onPressed: () => _toggleMode(true),
+                          icon: Icon(Icons.directions_walk, color: _routeMode == RouteMode.walking ? Colors.blue : Colors.grey),
+                          onPressed: () => _toggleMode(RouteMode.walking),
                         ),
                         IconButton(
-                          icon: Icon(Icons.directions_car, color: !_isWalking ? Colors.blue : Colors.black26),
-                          onPressed: () => _toggleMode(false),
+                          icon: Icon(Icons.directions_car, color: _routeMode == RouteMode.driving ? Colors.blue : Colors.grey),
+                          onPressed: () => _toggleMode(RouteMode.driving),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.directions_bike, color: _routeMode == RouteMode.cycling ? Colors.blue : Colors.grey),
+                          onPressed: () => _toggleMode(RouteMode.cycling),
                         ),
                       ],
                     ),
@@ -354,57 +378,40 @@ class RoutePageState extends State<RoutePage> {
             ),
           ),
           if (isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
+            Expanded(child: Center(child: CircularProgressIndicator()))
           else if (errorMessage != null)
             Expanded(child: Center(child: Text(errorMessage!, style: TextStyle(color: Colors.red))))
-          else ...[
-              Expanded(
-                child: FlutterMap(
-                  mapController: mapController,
-                  options: MapOptions(
-                    center: _calculateCenter(),
-                    zoom: 14.0,
+          else
+            Expanded(
+              child: FlutterMap(
+                mapController: mapController,
+                options: MapOptions(center: _calculateCenter(), zoom: 14.0),
+                children: [
+                  TileLayer(
+                    urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    subdomains: ['a', 'b', 'c'],
                   ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                      subdomains: ['a', 'b', 'c'],
+                  if (_hasRoute)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: currentRoutePoints,
+                          strokeWidth: 4.0,
+                          color: _routeMode == RouteMode.walking
+                              ? Colors.green
+                              : _routeMode == RouteMode.cycling
+                              ? Colors.orange
+                              : Colors.blue,
+                        ),
+                      ],
                     ),
-                    if (_hasRoute)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: currentRoutePoints,
-                            strokeWidth: 4.0,
-                            color: _isWalking ? Colors.green : Colors.blue,
-                          ),
-                        ],
-                      ),
-                    if (_hasRoute)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            width: 80.0,
-                            height: 80.0,
-                            point: currentRoutePoints.first,
-                            child: const Icon(Icons.location_on, color: Colors.green, size: 40),
-                          ),
-                          Marker(
-                            width: 80.0,
-                            height: 80.0,
-                            point: currentRoutePoints.last,
-                            child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 16),
-                child: Text(currentRouteInfo ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              )
-            ]
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(currentRouteInfo ?? "", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          )
         ],
       ),
     );
@@ -413,44 +420,35 @@ class RoutePageState extends State<RoutePage> {
   Widget buildInputRow(String label, String value, bool isStart) {
     return Row(
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(width: 8),
+        Text(label),
+        SizedBox(width: 10),
         Expanded(
           child: GestureDetector(
             onTap: () async {
-              final selectedPlace = await Navigator.push(
+              final result = await Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => SearchPage(isSelectingStartPoint: isStart),
-                ),
+                MaterialPageRoute(builder: (_) => SearchPage(isSelectingStartPoint: isStart)),
               );
-
-              if (selectedPlace != null) {
+              if (result != null) {
                 setState(() {
                   if (isStart) {
-                    startNameLocal = selectedPlace['name_en'];
-                    startCoordLocal = [
-                      selectedPlace['Longitude'],
-                      selectedPlace['Latitude'],
-                    ];
+                    startNameLocal = result['name_en'];
+                    startCoordLocal = [result['Longitude'], result['Latitude']];
                   } else {
-                    endNameLocal = selectedPlace['name_en'];
-                    endCoordLocal = [
-                      selectedPlace['Longitude'],
-                      selectedPlace['Latitude'],
-                    ];
+                    endNameLocal = result['name_en'];
+                    endCoordLocal = [result['Longitude'], result['Latitude']];
                   }
                 });
                 _searchRoute();
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 10),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
+                border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(value, style: const TextStyle(fontSize: 16)),
+              child: Text(value),
             ),
           ),
         ),
@@ -480,16 +478,19 @@ class RoutePageState extends State<RoutePage> {
           TextButton.icon(
             onPressed: _showDatePicker,
             icon: const Icon(Icons.calendar_today),
-            label: Text("${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}"),
+            label: Text(
+              "${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}",
+            ),
           ),
           TextButton.icon(
             onPressed: _showTimePicker,
             icon: const Icon(Icons.access_time),
-            label: Text("${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}"),
+            label: Text(
+              "${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}",
+            ),
           ),
-        ],
+        ]
       ],
     );
   }
 }
-
