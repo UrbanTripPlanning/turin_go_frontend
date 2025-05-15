@@ -340,7 +340,7 @@ class SavedPageState extends State<SavedPage> {
                           child: Container(
                             height: 5,
                             decoration: BoxDecoration(
-                              color: stripColor,
+                              color: stripColor.withOpacity(0.6),
                               borderRadius: const BorderRadius.only(
                                 bottomLeft: Radius.circular(12),
                                 bottomRight: Radius.circular(12),
