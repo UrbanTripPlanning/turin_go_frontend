@@ -1,4 +1,4 @@
-// Updated search_page.dart with fallback to Politecnico if location fails and disables 'Your Location' if location not available
+// Updated search_page.dart: no direct RoutePage pushes; always pop selected place
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,7 +7,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:turin_go_frontend/api/place.dart';
 import 'package:turin_go_frontend/map_picker_page.dart';
-import 'package:turin_go_frontend/route_page.dart';
 
 const LatLng politecnicoCoord = LatLng(45.062331, 7.662690);
 
@@ -118,24 +117,12 @@ class _SearchPageState extends State<SearchPage> {
           'Longitude': picked.longitude,
         });
       } else {
-        LatLng start;
-        try {
-          final pos = await Geolocator.getCurrentPosition();
-          start = LatLng(pos.latitude, pos.longitude);
-        } catch (e) {
-          start = politecnicoCoord;
-        }
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RoutePage(
-              startName: "Politecnico",
-              endName: "Pinned Location",
-              startCoord: [start.longitude, start.latitude],
-              endCoord: [picked.longitude, picked.latitude],
-            ),
-          ),
-        );
+        // simply return picked place as destination
+        Navigator.pop(context, {
+          'name_en': 'Pinned Location',
+          'Latitude': picked.latitude,
+          'Longitude': picked.longitude,
+        });
       }
     }
   }
@@ -169,33 +156,15 @@ class _SearchPageState extends State<SearchPage> {
     if (widget.isSelectingStartPoint) {
       Navigator.pop(context, place);
     } else {
+      // update recent searches
       final prefs = await SharedPreferences.getInstance();
       recentSearches.removeWhere((p) => p['name_en'] == place['name_en']);
       recentSearches.insert(0, place);
-      if (recentSearches.length > 10) {
-        recentSearches = recentSearches.sublist(0, 10);
-      }
+      if (recentSearches.length > 10) recentSearches = recentSearches.sublist(0, 10);
       await prefs.setString(_recentSearchesKey, json.encode(recentSearches));
 
-      LatLng start;
-      try {
-        final pos = await Geolocator.getCurrentPosition();
-        start = LatLng(pos.latitude, pos.longitude);
-      } catch (e) {
-        start = politecnicoCoord;
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RoutePage(
-            startName: "Politecnico",
-            endName: place['name_en'],
-            startCoord: [start.longitude, start.latitude],
-            endCoord: [place['Longitude'], place['Latitude']],
-          ),
-        ),
-      );
+      // simply return selected destination
+      Navigator.pop(context, place);
     }
   }
 
@@ -214,7 +183,10 @@ class _SearchPageState extends State<SearchPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFFB3E5FC),
-        title: Text(widget.isSelectingStartPoint ? 'Pick Starting Point' : 'Pick Destination', style: TextStyle(color: Colors.black)),
+        title: Text(
+          widget.isSelectingStartPoint ? 'Pick Starting Point' : 'Pick Destination',
+          style: TextStyle(color: Colors.black),
+        ),
         iconTheme: IconThemeData(color: Colors.black),
       ),
       body: Column(
@@ -234,8 +206,11 @@ class _SearchPageState extends State<SearchPage> {
             Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.my_location, color: _locationAvailable ? null : Colors.grey),
-                  title: Text("Your Location", style: TextStyle(color: _locationAvailable ? null : Colors.grey)),
+                  leading: Icon(Icons.my_location,
+                      color: _locationAvailable ? null : Colors.grey),
+                  title: Text("Your Location",
+                      style: TextStyle(
+                          color: _locationAvailable ? null : Colors.grey)),
                   onTap: _locationAvailable ? _selectCurrentLocation : null,
                 ),
                 ListTile(
@@ -256,9 +231,13 @@ class _SearchPageState extends State<SearchPage> {
           else
             Expanded(
               child: ListView.builder(
-                itemCount: searchResults.isNotEmpty ? searchResults.length : recentSearches.length,
+                itemCount: searchResults.isNotEmpty
+                    ? searchResults.length
+                    : recentSearches.length,
                 itemBuilder: (context, index) {
-                  final place = searchResults.isNotEmpty ? searchResults[index] : recentSearches[index];
+                  final place = searchResults.isNotEmpty
+                      ? searchResults[index]
+                      : recentSearches[index];
                   return ListTile(
                     leading: Icon(Icons.location_on, color: Colors.blueGrey),
                     title: Text(place['name_en']),

@@ -119,10 +119,14 @@ class _HomePageState extends State<HomePage> {
       for (var item in response['data']) {
         var start = item['start'];
         var end = item['end'];
-        result.add(TrafficPoint(LatLng(start[1], start[0]), LatLng(end[1], end[0]), item['flow_rate']));
+        result.add(TrafficPoint(
+          LatLng(start[1], start[0]),
+          LatLng(end[1], end[0]),
+          item['flow_rate'],
+        ));
       }
     }
-    return Future.value(result);
+    return result;
   }
 
   void _showDirectionSheet() {
@@ -188,7 +192,7 @@ class _HomePageState extends State<HomePage> {
                                 endName: 'Pinned Location',
                                 startCoord: [
                                   _currentPosition?.longitude ?? politecnicoCoord.longitude,
-                                  _currentPosition?.latitude ?? politecnicoCoord.latitude
+                                  _currentPosition?.latitude  ?? politecnicoCoord.latitude,
                                 ],
                                 endCoord: [
                                   _pinnedPoint!.longitude,
@@ -265,16 +269,39 @@ class _HomePageState extends State<HomePage> {
                 ]),
             ],
           ),
+
+          // SEARCH BAR: now returns a place and immediately routes
           Positioned(
             top: 50,
             left: 20,
             right: 20,
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                final place = await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SearchPage(isSelectingStartPoint: false)),
+                  MaterialPageRoute(
+                    builder: (_) => SearchPage(isSelectingStartPoint: false),
+                  ),
                 );
+                if (place != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RoutePage(
+                        startName: _usingFallback ? 'Politecnico' : 'Current Location',
+                        endName: place['name_en'],
+                        startCoord: [
+                          _currentPosition?.longitude ?? politecnicoCoord.longitude,
+                          _currentPosition?.latitude  ?? politecnicoCoord.latitude,
+                        ],
+                        endCoord: [
+                          place['Longitude'],
+                          place['Latitude'],
+                        ],
+                      ),
+                    ),
+                  );
+                }
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -299,6 +326,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
+
         ],
       ),
       floatingActionButton: FloatingActionButton(
