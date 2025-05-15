@@ -1,10 +1,8 @@
-// Updated home_page.dart with conditional import for web geolocation
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'search_page.dart';
 import 'route_page.dart';
@@ -29,6 +27,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late Future<List<TrafficPoint>> trafficData;
   LatLng? _currentPosition;
+  bool _usingFallback = false;
   static const String _locationKey = 'user_location';
   MapController mapController = MapController();
   bool _isMapMoving = false;
@@ -68,6 +67,7 @@ class _HomePageState extends State<HomePage> {
           }));
           setState(() {
             _currentPosition = location;
+            _usingFallback = false;
           });
           return;
         } else {
@@ -98,17 +98,19 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         _currentPosition = location;
+        _usingFallback = false;
       });
     } catch (e) {
-      print("Location fallback to politecnico: \$e");
+      print("Location fallback to politecnico: $e");
       setState(() {
         _currentPosition = politecnicoCoord;
+        _usingFallback = true;
       });
     }
   }
 
-  bool showTraffic = false;
   final LatLng _initialPosition = LatLng(45.06288, 7.66277);
+  bool showTraffic = false;
 
   Future<List<TrafficPoint>> fetchTrafficData() async {
     List<TrafficPoint> result = [];
@@ -182,10 +184,16 @@ class _HomePageState extends State<HomePage> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => RoutePage(
-                                startName: 'Politecnico',
+                                startName: _usingFallback ? 'Politecnico' : 'Current Location',
                                 endName: 'Pinned Location',
-                                startCoord: [_currentPosition?.longitude ?? politecnicoCoord.longitude, _currentPosition?.latitude ?? politecnicoCoord.latitude],
-                                endCoord: [_pinnedPoint!.longitude, _pinnedPoint!.latitude],
+                                startCoord: [
+                                  _currentPosition?.longitude ?? politecnicoCoord.longitude,
+                                  _currentPosition?.latitude ?? politecnicoCoord.latitude
+                                ],
+                                endCoord: [
+                                  _pinnedPoint!.longitude,
+                                  _pinnedPoint!.latitude
+                                ],
                               ),
                             ),
                           );
