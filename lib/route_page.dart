@@ -8,6 +8,8 @@ import 'package:turin_go_frontend/search_page.dart';
 import 'package:turin_go_frontend/saved_page.dart';
 import 'package:turin_go_frontend/map_picker_page.dart';
 import 'package:turin_go_frontend/main.dart';
+import 'package:flutter/cupertino.dart';
+
 
 enum TimeSelectionMode { leaveNow, departAt, arriveBy }
 enum RouteMode { walking, driving, cycling }
@@ -182,45 +184,43 @@ class RoutePageState extends State<RoutePage> {
     return LatLng(lat / currentRoutePoints.length, lng / currentRoutePoints.length);
   }
 
-  void _showDatePicker() async {
-    final DateTime? picked = await showDatePicker(
+  void _showCupertinoDateTimePicker() {
+    showModalBottomSheet(
       context: context,
-      initialDate: selectedDateTime,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 7)),
-    );
-    if (picked != null) {
-      setState(() {
-        selectedDateTime = DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          selectedDateTime.hour,
-          selectedDateTime.minute,
+      builder: (BuildContext context) {
+        return Container(
+          height: 300,
+          padding: EdgeInsets.only(top: 10),
+          color: Colors.white,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 220,
+                child: CupertinoDatePicker(
+                  initialDateTime: selectedDateTime,
+                  minimumDate: DateTime.now(),
+                  maximumDate: DateTime.now().add(Duration(days: 7)),
+                  mode: CupertinoDatePickerMode.dateAndTime,
+                  use24hFormat: true,
+                  onDateTimeChanged: (DateTime newDateTime) {
+                    setState(() => selectedDateTime = newDateTime);
+                  },
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _searchRoute(); // Refresh route after selection
+                },
+                child: Text("Confirm", style: TextStyle(color: Colors.blue)),
+              ),
+            ],
+          ),
         );
-      });
-      _searchRoute();
-    }
+      },
+    );
   }
 
-  void _showTimePicker() async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(selectedDateTime),
-    );
-    if (picked != null) {
-      setState(() {
-        selectedDateTime = DateTime(
-          selectedDateTime.year,
-          selectedDateTime.month,
-          selectedDateTime.day,
-          picked.hour,
-          picked.minute,
-        );
-      });
-      _searchRoute();
-    }
-  }
 
 
 
@@ -493,22 +493,21 @@ class RoutePageState extends State<RoutePage> {
         ),
         if (timeMode != TimeSelectionMode.leaveNow) ...[
           const SizedBox(width: 10),
-          TextButton.icon(
-            onPressed: _showDatePicker,
-            icon: const Icon(Icons.calendar_today),
+          ElevatedButton.icon(
+            onPressed: _showCupertinoDateTimePicker,
+            icon: const Icon(Icons.event),
             label: Text(
-              "${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')}",
+              "${selectedDateTime.year}-${selectedDateTime.month.toString().padLeft(2, '0')}-${selectedDateTime.day.toString().padLeft(2, '0')} "
+                  "${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}",
             ),
-          ),
-          TextButton.icon(
-            onPressed: _showTimePicker,
-            icon: const Icon(Icons.access_time),
-            label: Text(
-              "${selectedDateTime.hour.toString().padLeft(2, '0')}:${selectedDateTime.minute.toString().padLeft(2, '0')}",
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade50,
+              foregroundColor: Colors.black87,
             ),
           ),
         ]
       ],
     );
   }
+
 }
