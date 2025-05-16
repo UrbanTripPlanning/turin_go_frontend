@@ -405,9 +405,27 @@ class RoutePageState extends State<RoutePage> {
                         ),
                       ],
                     ),
+                  if (_hasRoute)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          width: 80.0,
+                          height: 80.0,
+                          point: currentRoutePoints.first,
+                          child: const Icon(Icons.location_on, color: Colors.green, size: 40),
+                        ),
+                        Marker(
+                          width: 80.0,
+                          height: 80.0,
+                          point: currentRoutePoints.last,
+                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
+
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(currentRouteInfo ?? "", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
