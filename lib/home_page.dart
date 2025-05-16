@@ -341,8 +341,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Color getColorWithFlowRate(double flow) {
-    if (flow > 0.75) return Colors.green;
-    if (flow > 0.4) return Colors.yellow;
+    if (flow > 0.55) return Colors.green; // 30 / 50
+    if (flow > 0.36) return Colors.yellow; // 18 / 50
     return Colors.red;
   }
 }
