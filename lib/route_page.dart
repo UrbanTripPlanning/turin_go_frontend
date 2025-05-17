@@ -185,15 +185,25 @@ class RoutePageState extends State<RoutePage> {
   }
 
   void _showCupertinoDateTimePicker() {
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
         return Container(
-          height: 300,
-          padding: EdgeInsets.only(top: 10),
+          height: 320,
           color: Colors.white,
+          padding: const EdgeInsets.only(top: 10),
           child: Column(
             children: [
+              if (isLandscape)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6.0),
+                  child: Text(
+                    "🖱️ Use mouse wheel or trackpad to scroll",
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                ),
               SizedBox(
                 height: 220,
                 child: CupertinoDatePicker(
@@ -210,9 +220,9 @@ class RoutePageState extends State<RoutePage> {
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _searchRoute(); // Refresh route after selection
+                  _searchRoute();
                 },
-                child: Text("Confirm", style: TextStyle(color: Colors.blue)),
+                child: const Text("Confirm", style: TextStyle(color: Colors.blue)),
               ),
             ],
           ),
